@@ -1,0 +1,24 @@
+{
+    "name": "companion-satellite-arduino",
+    "version": "0.0.1",
+    "description": "A port of companion-satellite to arduino using the V2 API",
+    "keywords": "companion",
+    "repository":
+    {
+      "type": "git",
+      "url": "https://github.com/alex-Arc/companion-satellite-arduino.git"
+    },
+    "authors":
+    [
+      {
+        "name": "Alex Christoffer Rasmussen",
+        "email": "ac@omnivox.dk",
+        "url": "omnivox.dk"
+      }
+    ],
+    "license": "MIT",
+    "dependencies": {
+    },
+    "frameworks": "Arduino",
+    "platforms": "teensy"
+  }
