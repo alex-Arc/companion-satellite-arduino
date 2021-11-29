@@ -20,5 +20,5 @@
     "dependencies": {
     },
     "frameworks": "Arduino",
-    "platforms": "teensy"
+    "platforms": "*"
   }
