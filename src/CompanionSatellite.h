@@ -80,7 +80,7 @@ private:
     } CompanionSatellitePacket2_t;
 
     bool initSocket();
-    bool sendCommand(CompanionSatellitePacket_t);
+    bool sendCommand(CompanionSatellitePacket2_t);
     CompanionSatellitePacket2_t readPacket();
     void parseParameters();
     void sendPing();
@@ -91,7 +91,7 @@ private:
     uint16_t _port;
 
     std::queue<CompanionSatellitePacket_t> _cmdIn;
-
+    CompanionSatellitePacket2_t _pack;
     elapsedMillis _timeout;
 
     char buf[BUFFER_SIZE];
@@ -126,7 +126,6 @@ CompanionSatellite::CompanionSatellitePacket2_t CompanionSatellite::readPacket()
 {
     int len = _socket->available();
     CompanionSatellitePacket2_t pack;
-    pack.cmd_index = CompanionSatelliteCommand::NONE;
     if (len)
     {
         if (len > BUFFER_SIZE)
@@ -146,7 +145,7 @@ CompanionSatellite::CompanionSatellitePacket2_t CompanionSatellite::readPacket()
 
                 step = 1;
                 pack.cmd.assign(&buf[lastI], i - lastI);
-                Serial.printf("CMD: '%s'\n" pack.cmd.c_str());
+                Serial.printf("CMD: '%s'\n", pack.cmd.c_str());
                 break;
 
             case 1:
@@ -195,7 +194,7 @@ void CompanionSatellite::parseParameters()
     Serial.println("parseParameters()");
 }
 
-bool CompanionSatellite::sendCommand(CompanionSatellitePacket_t packet)
+bool CompanionSatellite::sendCommand(CompanionSatellitePacket2_t packet)
 {
     Serial.println("sendCommand()");
 
@@ -203,15 +202,18 @@ bool CompanionSatellite::sendCommand(CompanionSatellitePacket_t packet)
     {
         Serial.print("SENDING: ");
 
-        _socket->print(CMDS[packet.cmd].c_str());
-        Serial.print(CMDS[packet.cmd].c_str());
+        _socket->print(packet.cmd.c_str());
+        Serial.print(packet.cmd.c_str());
         _socket->print(" ");
         Serial.print(" ");
-        for (std::vector<std::string>::iterator it = packet.args.begin(); it != packet.args.end(); ++it)
+        for (int i = 0; i < packet.key.size(); i++)
         {
-            _socket->print(it->c_str());
-            Serial.print(it->c_str());
-
+            _socket->print(packet.key[i].c_str());
+            Serial.print(packet.key[i].c_str());
+            _socket->print("=");
+            Serial.print("=");
+            _socket->print(packet.val[i].c_str());
+            Serial.print(packet.val[i].c_str());
             _socket->print(" ");
             Serial.print(" ");
         }
@@ -224,20 +226,36 @@ bool CompanionSatellite::sendCommand(CompanionSatellitePacket_t packet)
 void CompanionSatellite::addDevice()
 {
     Serial.println("addDevice()");
-    CompanionSatellitePacket_t pack;
-    pack.cmd = CompanionSatelliteCommand::ADD_DEVICE;
-    pack.args.push_back("DEVICEID=00000");
-    pack.args.push_back("PRODUCT_NAME=\"Satellite Arduino\"");
-    pack.args.push_back("KEYS_TOTAL=2");
-    pack.args.push_back("KEYS_PER_ROW=2");
-    pack.args.push_back("BITMAPS=false");
-    pack.args.push_back("COLORS=true");
-    pack.args.push_back("TEXT=false");
+    CompanionSatellitePacket2_t pack;
+    pack.cmd = "ADD-DEVICE";
+    pack.key.push_back(std::string("DEVICEID"));
+    pack.val.push_back(std::string("00000"));
+
+    pack.key.push_back(std::string("PRODUCT_NAME"));
+    pack.val.push_back(std::string("\"Satellite Arduino\""));
+
+    pack.key.push_back(std::string("KEYS_TOTAL"));
+    pack.val.push_back(std::string("2"));
+
+    pack.key.push_back(std::string("KEYS_PER_ROW"));
+    pack.val.push_back(std::string("2"));
+
+    pack.key.push_back(std::string("BITMAPS"));
+    pack.val.push_back(std::string("false"));
+
+    pack.key.push_back(std::string("COLORS"));
+    pack.val.push_back(std::string("true"));
+
+    pack.key.push_back(std::string("TEXT"));
+    pack.val.push_back(std::string("false"));
+
     sendCommand(pack);
 }
 
 int CompanionSatellite::maintain()
 {
+    _pack = readPacket();
+
     switch (_status)
     {
     case CompanionSatelliteStatus::NoConnection:
@@ -259,42 +277,34 @@ int CompanionSatellite::maintain()
     }
     case CompanionSatelliteStatus::AwaitingBegin:
     {
-        CompanionSatellitePacket2_t pack = readPacket();
-        if (pack.cmd_index)
+        if (_pack.cmd.compare("BEGIN") == 0 && _pack.key[0].compare("Companion") == 0 && _pack.key[1].compare("Version") == 0)
         {
-            // if (strcmp(pack.cmd, "BEGIN") == 0)
-            // {
-            //     Serial.println("begin match");
-            // }
-            // if (_str.substr(0, 23).compare("BEGIN Companion Version") == 0)
-            // {
-            //     size_t dot1 = _str.find_first_of('.') + 1;
-            //     size_t dot2 = _str.find_last_of('.') + 1;
-            //     size_t dash1 = _str.find_first_of('-') + 1;
-            //     std::string major = _str.substr(24, 1);
-            //     std::string minor = _str.substr(dot1, 1);
-            //     std::string patch = _str.substr(dot2, 1);
-
-            //     Serial.printf("major=%s minor=%s patch=%s \n", major.c_str(), minor.c_str(), patch.c_str());
-
-            //     if (atoi(major.c_str()) == VERSION_MAJOR && atoi(minor.c_str()) >= VERSION_MINOR)
-            //     {
-            //         Serial.println("version match");
-            //         _status = CompanionSatelliteStatus::AddingDevice;
-            //         addDevice();
-            //     }
-            // }
+            Serial.println("begin match");
+            size_t dot1 = _pack.val[1].find_first_of('.');
+            size_t dot2 = _pack.val[1].find_last_of('.');
+            // size_t dash1 = _pack.val[1].find_first_of('-') + 1;
+            int major = atoi(_pack.val[1].substr(dot1 - 1, 1).c_str());
+            int minor = atoi(_pack.val[1].substr(dot1 - 1, 1).c_str());
+            // std::string patch = _pack.val[1].substr(dot2+1, 1);
+            Serial.printf("major=%d minor=%d patch=%s \n", major, minor);
+            if (major == VERSION_MAJOR && minor >= VERSION_MINOR)
+            {
+                Serial.println("version match");
+                _status = CompanionSatelliteStatus::AddingDevice;
+                addDevice();
+            }
         }
-        // if (_timeout > RECONNECT_DELAY)
-        //     _status = CompanionSatelliteStatus::Starting;
+
+        if (_timeout > RECONNECT_DELAY)
+            _status = CompanionSatelliteStatus::Starting;
         break;
     }
     case CompanionSatelliteStatus::AddingDevice:
     {
-        // if (readPacket())
-        // {
-        //     parseParameters();
-        // }
+        if (_pack.cmd.compare("ADD-DEVICE"))
+        {
+            // parseParameters();
+        }
         // if (_timeout > RECONNECT_DELAY)
         //     _status = CompanionSatelliteStatus::Starting;
     }
