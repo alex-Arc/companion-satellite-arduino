@@ -34,15 +34,6 @@ void setup()
 void loop()
 {
     compSat.maintain();
-    int len = client.available();
-    if (len > 0)
-    {
-        byte buffer[80];
-        if (len > 80)
-            len = 80;
 
-        client.read(buffer, len);
-        Serial.write(buffer, len); // show in the serial monitor (slows some boards)
-    }
     delay(10);
 }

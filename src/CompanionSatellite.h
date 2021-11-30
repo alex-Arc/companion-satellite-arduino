@@ -4,13 +4,15 @@
 #include <Arduino.h>
 #include <string>
 #include <vector>
+#include <queue>
 
 #define Use_NativeEthernet
 #ifdef Use_NativeEthernet
 #include <NativeEthernet.h>
 #endif
 
-const int BUFFER_SIZE = 64;
+const int BUFFER_SIZE = 254;
+const int MAX_CHAR = 16;
 const int RECONNECT_DELAY = 1000;
 const int VERSION_MAJOR = 2;
 const int VERSION_MINOR = 2;
@@ -61,10 +63,26 @@ private:
         std::vector<std::string> args;
     } CompanionSatellitePacket_t;
 
+    // typedef struct
+    // {
+    //     char key[MAX_CHAR];
+    //     char val[MAX_CHAR];
+    // } CompanionSatellitePacketArg_t;
+
+    typedef struct
+    {
+        CompanionSatelliteCommand cmd_index;
+        // char cmd[MAX_CHAR];
+        std::string cmd;
+        // CompanionSatellitePacketArg_t args[5];
+        std::vector<std::string> key;
+        std::vector<std::string> val;
+    } CompanionSatellitePacket2_t;
+
     bool initSocket();
     bool sendCommand(CompanionSatellitePacket_t);
-    int readPacket();
-    CompanionSatellitePacket_t parseParameters();
+    CompanionSatellitePacket2_t readPacket();
+    void parseParameters();
     void sendPing();
     void addDevice();
 
@@ -72,9 +90,11 @@ private:
     IPAddress _ip;
     uint16_t _port;
 
+    std::queue<CompanionSatellitePacket_t> _cmdIn;
+
     elapsedMillis _timeout;
 
-    uint8_t buf[BUFFER_SIZE];
+    char buf[BUFFER_SIZE];
 
     //TODO: maybe pass it as a parmater
     std::string _str;
@@ -102,41 +122,77 @@ CompanionSatellite::~CompanionSatellite()
         _socket->close();
 }
 
-int CompanionSatellite::readPacket()
+CompanionSatellite::CompanionSatellitePacket2_t CompanionSatellite::readPacket()
 {
     int len = _socket->available();
-
+    CompanionSatellitePacket2_t pack;
+    pack.cmd_index = CompanionSatelliteCommand::NONE;
     if (len)
     {
         if (len > BUFFER_SIZE)
             len = BUFFER_SIZE;
-        _socket->read(buf, len);
-        _str.assign((char *)buf, len);
-        Serial.print(_str.c_str());
+        _socket->read((uint8_t *)buf, len);
+
+        int step = 0;
+        int lastI = 0;
+        for (int i = 0; i < len; i++)
+        {
+            lastI = i;
+            switch (step)
+            {
+            case 0:
+                while (buf[i] != ' ' && i < len)
+                    i++;
+
+                step = 1;
+                pack.cmd.assign(&buf[lastI], i - lastI);
+                Serial.printf("CMD: '%s'\n" pack.cmd.c_str());
+                break;
+
+            case 1:
+                while (buf[i] != ' ' && buf[i] != '\n' && buf[i] != '=' && i < len)
+                    i++;
+
+                if (buf[i] == '=')
+                {
+                    step = 2;
+                    pack.key.push_back(std::string().assign(&buf[lastI], i - lastI));
+                }
+                else
+                {
+                    (buf[i] == '\n') ? step = 0 : step = 1;
+
+                    pack.key.push_back(std::string().assign(&buf[lastI], i - lastI));
+                    pack.val.push_back(std::string().assign("true"));
+                    Serial.printf("KEY:'%s' VAL:'%s'\n", pack.key.back().c_str(), pack.val.back().c_str());
+                }
+
+                break;
+
+            case 2:
+                while (buf[i] != ' ' && buf[i] != '\n' && buf[i] != '"' && i < len)
+                    i++;
+                //TODO: take care of spaces in ""
+                if (buf[i] != '"')
+                {
+                    (buf[i] == '\n') ? step = 0 : step = 1;
+                    pack.val.push_back(std::string().assign(&buf[lastI], i - lastI));
+                    Serial.printf("KEY:'%s' VAL:'%s'\n", pack.key.back().c_str(), pack.val.back().c_str());
+                }
+                break;
+
+            default:
+                break;
+            }
+        }
     }
-    return len;
+    return pack;
 }
 
-CompanionSatellite::CompanionSatellitePacket_t CompanionSatellite::parseParameters()
+//TODO: move to read and do it in stream
+void CompanionSatellite::parseParameters()
 {
-    CompanionSatellitePacket_t pack;
-    pack.cmd = CompanionSatelliteCommand::NONE;
-
-    int cmd_size = _str.find_first_not_of(" ");
-    if (cmd_size){
-        Serial.println(_str.substr(0, cmd_size).c_str());
-        // switch (_str.substr(0, cmd_size))
-        // {
-        // case /* constant-expression */:
-        //     /* code */
-        //     break;
-        
-        // default:
-        //     break;
-        // }
-    }
-
-    return pack;
+    Serial.println("parseParameters()");
 }
 
 bool CompanionSatellite::sendCommand(CompanionSatellitePacket_t packet)
@@ -203,38 +259,42 @@ int CompanionSatellite::maintain()
     }
     case CompanionSatelliteStatus::AwaitingBegin:
     {
-        if (readPacket())
+        CompanionSatellitePacket2_t pack = readPacket();
+        if (pack.cmd_index)
         {
-            if (_str.substr(0, 23).compare("BEGIN Companion Version") == 0)
-            {
-                Serial.println("begin match");
-                size_t dot1 = _str.find_first_of('.') + 1;
-                size_t dot2 = _str.find_last_of('.') + 1;
-                size_t dash1 = _str.find_first_of('-') + 1;
-                std::string major = _str.substr(24, 1);
-                std::string minor = _str.substr(dot1, 1);
-                std::string patch = _str.substr(dot2, 1);
+            // if (strcmp(pack.cmd, "BEGIN") == 0)
+            // {
+            //     Serial.println("begin match");
+            // }
+            // if (_str.substr(0, 23).compare("BEGIN Companion Version") == 0)
+            // {
+            //     size_t dot1 = _str.find_first_of('.') + 1;
+            //     size_t dot2 = _str.find_last_of('.') + 1;
+            //     size_t dash1 = _str.find_first_of('-') + 1;
+            //     std::string major = _str.substr(24, 1);
+            //     std::string minor = _str.substr(dot1, 1);
+            //     std::string patch = _str.substr(dot2, 1);
 
-                Serial.printf("major=%s minor=%s patch=%s \n", major.c_str(), minor.c_str(), patch.c_str());
+            //     Serial.printf("major=%s minor=%s patch=%s \n", major.c_str(), minor.c_str(), patch.c_str());
 
-                if (atoi(major.c_str()) == VERSION_MAJOR && atoi(minor.c_str()) >= VERSION_MINOR)
-                {
-                    Serial.println("version match");
-                    _status = CompanionSatelliteStatus::AddingDevice;
-                    addDevice();
-                }
-            }
+            //     if (atoi(major.c_str()) == VERSION_MAJOR && atoi(minor.c_str()) >= VERSION_MINOR)
+            //     {
+            //         Serial.println("version match");
+            //         _status = CompanionSatelliteStatus::AddingDevice;
+            //         addDevice();
+            //     }
+            // }
         }
-        if (_timeout > RECONNECT_DELAY)
-            _status = CompanionSatelliteStatus::Starting;
+        // if (_timeout > RECONNECT_DELAY)
+        //     _status = CompanionSatelliteStatus::Starting;
         break;
     }
     case CompanionSatelliteStatus::AddingDevice:
     {
-        if (readPacket())
-        {
-            parseParameters();
-        }
+        // if (readPacket())
+        // {
+        //     parseParameters();
+        // }
         // if (_timeout > RECONNECT_DELAY)
         //     _status = CompanionSatelliteStatus::Starting;
     }
