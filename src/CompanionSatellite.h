@@ -90,7 +90,7 @@ private:
     IPAddress _ip;
     uint16_t _port;
 
-    std::queue<CompanionSatellitePacket_t> _cmdIn;
+    std::queue<CompanionSatellitePacket2_t> _cmdIn;
     CompanionSatellitePacket2_t _pack;
     elapsedMillis _timeout;
 
@@ -144,7 +144,8 @@ CompanionSatellite::CompanionSatellitePacket2_t CompanionSatellite::readPacket()
                     i++;
 
                 step = 1;
-                pack.cmd.assign(&buf[lastI], i - lastI);
+                _cmdIn.push(CompanionSatellitePacket2_t());
+                _cmdIn.back().cmd.assign(&buf[lastI], i - lastI);
                 Serial.printf("CMD: '%s'\n", pack.cmd.c_str());
                 break;
 
@@ -155,15 +156,15 @@ CompanionSatellite::CompanionSatellitePacket2_t CompanionSatellite::readPacket()
                 if (buf[i] == '=')
                 {
                     step = 2;
-                    pack.key.push_back(std::string().assign(&buf[lastI], i - lastI));
+                    _cmdIn.back().key.push_back(std::string().assign(&buf[lastI], i - lastI));
                 }
                 else
                 {
-                    (buf[i] == '\n') ? step = 0 : step = 1;
+                    (buf[i] == '\n') ? step = 3 : step = 1;
 
-                    pack.key.push_back(std::string().assign(&buf[lastI], i - lastI));
-                    pack.val.push_back(std::string().assign("true"));
-                    Serial.printf("KEY:'%s' VAL:'%s'\n", pack.key.back().c_str(), pack.val.back().c_str());
+                    _cmdIn.back().key.push_back(std::string().assign(&buf[lastI], i - lastI));
+                    _cmdIn.back().val.push_back(std::string().assign("true"));
+                    Serial.printf("KEY:'%s' VAL:'%s'\n", _cmdIn.back().key.back().c_str(), _cmdIn.back().val.back().c_str());
                 }
 
                 break;
@@ -174,17 +175,24 @@ CompanionSatellite::CompanionSatellitePacket2_t CompanionSatellite::readPacket()
                 //TODO: take care of spaces in ""
                 if (buf[i] != '"')
                 {
-                    (buf[i] == '\n') ? step = 0 : step = 1;
-                    pack.val.push_back(std::string().assign(&buf[lastI], i - lastI));
-                    Serial.printf("KEY:'%s' VAL:'%s'\n", pack.key.back().c_str(), pack.val.back().c_str());
+                    (buf[i] == '\n') ? step = 3 : step = 1;
+                    _cmdIn.back().val.push_back(std::string().assign(&buf[lastI], i - lastI));
+                    Serial.printf("KEY:'%s' VAL:'%s'\n", _cmdIn.back().key.back().c_str(), _cmdIn.back().val.back().c_str());
                 }
                 break;
-
             default:
                 break;
             }
+            if (step == 3)
+            {
+                Serial.printf("push cmd %s \n",  _cmdIn.back().cmd.c_str());
+
+                step = 0;
+            }
         }
     }
+    // Serial.println(_cmdIn.front().cmd.c_str());
+
     return pack;
 }
 
@@ -277,22 +285,26 @@ int CompanionSatellite::maintain()
     }
     case CompanionSatelliteStatus::AwaitingBegin:
     {
-        if (_pack.cmd.compare("BEGIN") == 0 && _pack.key[0].compare("Companion") == 0 && _pack.key[1].compare("Version") == 0)
+        if (!_cmdIn.empty())
         {
-            Serial.println("begin match");
-            size_t dot1 = _pack.val[1].find_first_of('.');
-            size_t dot2 = _pack.val[1].find_last_of('.');
-            // size_t dash1 = _pack.val[1].find_first_of('-') + 1;
-            int major = atoi(_pack.val[1].substr(dot1 - 1, 1).c_str());
-            int minor = atoi(_pack.val[1].substr(dot1 - 1, 1).c_str());
-            // std::string patch = _pack.val[1].substr(dot2+1, 1);
-            Serial.printf("major=%d minor=%d patch=%s \n", major, minor);
-            if (major == VERSION_MAJOR && minor >= VERSION_MINOR)
+            CompanionSatellitePacket2_t p = _cmdIn.front();
+            Serial.println(_cmdIn.front().cmd.c_str());
+            if (_cmdIn.front().cmd.compare("BEGIN") == 0 && _cmdIn.front().key[0].compare("Companion") == 0 && _cmdIn.front().key[1].compare("Version") == 0)
             {
-                Serial.println("version match");
-                _status = CompanionSatelliteStatus::AddingDevice;
-                addDevice();
+                Serial.println("begin match");
+                size_t dot1 = _cmdIn.front().val[1].find_first_of('.');
+                size_t dot2 = _cmdIn.front().val[1].find_last_of('.');
+                int major = atoi(_cmdIn.front().val[1].substr(dot1 - 1, 1).c_str());
+                int minor = atoi(_cmdIn.front().val[1].substr(dot2 - 1, 1).c_str());
+                Serial.printf("major=%d minor=%d \n", major, minor);
+                if (major == VERSION_MAJOR && minor >= VERSION_MINOR)
+                {
+                    Serial.println("version match");
+                    _status = CompanionSatelliteStatus::AddingDevice;
+                    addDevice();
+                }
             }
+            _cmdIn.pop();
         }
 
         if (_timeout > RECONNECT_DELAY)

@@ -20,6 +20,10 @@ void setup()
     {
         ; // wait for serial port to connect. Needed for native USB port only
     }
+    if (CrashReport)
+  {
+    Serial.print(CrashReport);
+  }
 
     // try to congifure using IP address instead of DHCP:
     Ethernet.begin(mac, ip, myDns);
