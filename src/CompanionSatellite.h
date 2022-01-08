@@ -115,6 +115,7 @@ public:
     void connect(IPAddress ip, uint16_t port = 16622);
     int maintain();
     void keyPress(uint8_t key, uint8_t state = 2);
+    uint32_t color[8];
 };
 
 CompanionSatellite::CompanionSatellite(EthernetClient *socket)
@@ -398,7 +399,10 @@ int CompanionSatellite::maintain()
 
                 break;
             case CompanionSatelliteCommand::KEY_STATE:
-
+                uint8_t index;
+                sscanf(_cmdIn.front().val[1].c_str(), "%d", &index);
+                _cmdIn.front().val[3].erase(0, 1);
+                sscanf(_cmdIn.front().val[3].c_str(), "%06x", &color[index]);
                 break;
             default:
                 break;

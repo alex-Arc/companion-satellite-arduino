@@ -126,5 +126,7 @@ void loop()
     {
       compSat.keyPress(i, 0);
     }
+    leds.setPixelColor(i, compSat.color[i]);
   }
+  leds.show();
 }
