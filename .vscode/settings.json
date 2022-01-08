@@ -39,6 +39,7 @@
         "utility": "cpp",
         "typeinfo": "cpp",
         "iostream": "cpp",
-        "queue": "cpp"
+        "queue": "cpp",
+        "map": "cpp"
     }
 }

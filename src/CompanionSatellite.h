@@ -5,6 +5,9 @@
 #include <string>
 #include <vector>
 #include <queue>
+#include <map>
+
+// #include <etl/to_string.h>
 
 #define Use_NativeEthernet
 #ifdef Use_NativeEthernet
@@ -21,17 +24,6 @@ const int VERSION_PATCH = 0;
 class CompanionSatellite
 {
 private:
-    const std::vector<std::string> CMDS = {
-        "QUIT",
-        "PING",
-        "PONG",
-        "ADD-DEVICE",
-        "REMOVE-DEVICE",
-        "KEY-PRESS",
-        "KEY-STATE",
-        "KEYS-CLEAR",
-        "BRIGHTNESS"};
-
     enum CompanionSatelliteCommand
     {
         NONE = -1,
@@ -46,6 +38,28 @@ private:
         BRIGHTNESS,
     };
 
+    std::map<std::string, CompanionSatelliteCommand> s_mapStringToCompanionSatelliteCommand = {
+        {"QUIT", CompanionSatelliteCommand::QUIT},
+        {"PING", CompanionSatelliteCommand::PING},
+        {"PONG", CompanionSatelliteCommand::PONG},
+        {"ADD-DEVICE", CompanionSatelliteCommand::ADD_DEVICE},
+        {"REMOVE-DEVICE", CompanionSatelliteCommand::REMOVE_DEVICE},
+        {"KEY-PRESS", CompanionSatelliteCommand::KEY_PRESS},
+        {"KEY-STATE", CompanionSatelliteCommand::KEY_STATE},
+        {"KEYS-CLEAR", CompanionSatelliteCommand::KEYS_CLEAR},
+        {"BRIGHTNESS", CompanionSatelliteCommand::BRIGHTNESS}};
+
+    std::map<CompanionSatelliteCommand, std::string> s_mapCompanionSatelliteCommandToString = {
+        {CompanionSatelliteCommand::QUIT, "QUIT"},
+        {CompanionSatelliteCommand::PING, "PING"},
+        {CompanionSatelliteCommand::PONG, "PONG"},
+        {CompanionSatelliteCommand::ADD_DEVICE, "ADD-DEVICE"},
+        {CompanionSatelliteCommand::REMOVE_DEVICE, "REMOVE-DEVICE"},
+        {CompanionSatelliteCommand::KEY_PRESS, "KEY-PRESS"},
+        {CompanionSatelliteCommand::KEY_STATE, "KEY-STATE"},
+        {CompanionSatelliteCommand::KEYS_CLEAR, "KEYS-CLEAR"},
+        {CompanionSatelliteCommand::BRIGHTNESS, "BRIGHTNESS"}};
+
     enum CompanionSatelliteStatus
     {
         NoConnection = -2,
@@ -59,39 +73,30 @@ private:
 
     typedef struct
     {
-        CompanionSatelliteCommand cmd;
-        std::vector<std::string> args;
-    } CompanionSatellitePacket_t;
-
-    // typedef struct
-    // {
-    //     char key[MAX_CHAR];
-    //     char val[MAX_CHAR];
-    // } CompanionSatellitePacketArg_t;
-
-    typedef struct
-    {
         CompanionSatelliteCommand cmd_index;
         // char cmd[MAX_CHAR];
         std::string cmd;
         // CompanionSatellitePacketArg_t args[5];
         std::vector<std::string> key;
         std::vector<std::string> val;
-    } CompanionSatellitePacket2_t;
+    } CompanionSatellitePacket_t;
 
     bool initSocket();
-    bool sendCommand(CompanionSatellitePacket2_t);
-    CompanionSatellitePacket2_t readPacket();
+    bool sendCommand(CompanionSatellitePacket_t);
+    void readPacket();
     void parseParameters();
     void sendPing();
     void addDevice();
+    void quit(boolean reconnect = false);
+
+    CompanionSatelliteCommand stringMatchCmd(std::string const &inString);
 
     EthernetClient *_socket = nullptr;
     IPAddress _ip;
     uint16_t _port;
 
-    std::queue<CompanionSatellitePacket2_t> _cmdIn;
-    CompanionSatellitePacket2_t _pack;
+    std::queue<CompanionSatellitePacket_t> _cmdIn;
+    CompanionSatellitePacket_t _pack;
     elapsedMillis _timeout;
 
     char buf[BUFFER_SIZE];
@@ -109,6 +114,7 @@ public:
 
     void connect(IPAddress ip, uint16_t port = 16622);
     int maintain();
+    void keyPress(uint8_t key, uint8_t state = 2);
 };
 
 CompanionSatellite::CompanionSatellite(EthernetClient *socket)
@@ -122,10 +128,10 @@ CompanionSatellite::~CompanionSatellite()
         _socket->close();
 }
 
-CompanionSatellite::CompanionSatellitePacket2_t CompanionSatellite::readPacket()
+void CompanionSatellite::readPacket()
 {
     int len = _socket->available();
-    CompanionSatellitePacket2_t pack;
+    CompanionSatellitePacket_t pack;
     if (len)
     {
         if (len > BUFFER_SIZE)
@@ -134,6 +140,7 @@ CompanionSatellite::CompanionSatellitePacket2_t CompanionSatellite::readPacket()
 
         int step = 0;
         int lastI = 0;
+        boolean inQuotes = false;
         for (int i = 0; i < len; i++)
         {
             lastI = i;
@@ -144,9 +151,9 @@ CompanionSatellite::CompanionSatellitePacket2_t CompanionSatellite::readPacket()
                     i++;
 
                 step = 1;
-                _cmdIn.push(CompanionSatellitePacket2_t());
+                _cmdIn.push(CompanionSatellitePacket_t());
                 _cmdIn.back().cmd.assign(&buf[lastI], i - lastI);
-                Serial.printf("CMD: '%s'\n", pack.cmd.c_str());
+                Serial.printf("CMD: '%s'\n", _cmdIn.back().cmd.c_str());
                 break;
 
             case 1:
@@ -170,63 +177,57 @@ CompanionSatellite::CompanionSatellitePacket2_t CompanionSatellite::readPacket()
                 break;
 
             case 2:
-                while (buf[i] != ' ' && buf[i] != '\n' && buf[i] != '"' && i < len)
-                    i++;
-                //TODO: take care of spaces in ""
-                if (buf[i] != '"')
+                while (buf[i] != '\n' && i < len)
                 {
-                    (buf[i] == '\n') ? step = 3 : step = 1;
-                    _cmdIn.back().val.push_back(std::string().assign(&buf[lastI], i - lastI));
-                    Serial.printf("KEY:'%s' VAL:'%s'\n", _cmdIn.back().key.back().c_str(), _cmdIn.back().val.back().c_str());
+                    if (buf[i] == '"')
+                    {
+                        inQuotes = !inQuotes;
+                        Serial.println("in quotes");
+                    }
+                    if (buf[i] == ' ' && !inQuotes)
+                    {
+                        break;
+                    }
+                    i++;
                 }
+
+                (buf[i] == '\n') ? step = 3 : step = 1;
+                _cmdIn.back().val.push_back(std::string().assign(&buf[lastI], i - lastI));
+                Serial.printf("KEY:'%s' VAL:'%s'\n", _cmdIn.back().key.back().c_str(), _cmdIn.back().val.back().c_str());
+
                 break;
             default:
                 break;
             }
             if (step == 3)
             {
-                Serial.printf("push cmd %s \n",  _cmdIn.back().cmd.c_str());
+                Serial.printf("push cmd %s \n", _cmdIn.back().cmd.c_str());
 
                 step = 0;
             }
         }
     }
-    // Serial.println(_cmdIn.front().cmd.c_str());
-
-    return pack;
 }
 
-//TODO: move to read and do it in stream
-void CompanionSatellite::parseParameters()
-{
-    Serial.println("parseParameters()");
-}
-
-bool CompanionSatellite::sendCommand(CompanionSatellitePacket2_t packet)
+bool CompanionSatellite::sendCommand(CompanionSatellitePacket_t packet)
 {
     Serial.println("sendCommand()");
 
     if (_status >= CompanionSatelliteStatus::AwaitingBegin)
     {
         Serial.print("SENDING: ");
+        Serial.println(packet.cmd.c_str());
 
         _socket->print(packet.cmd.c_str());
-        Serial.print(packet.cmd.c_str());
         _socket->print(" ");
-        Serial.print(" ");
-        for (int i = 0; i < packet.key.size(); i++)
+        for (uint8_t i = 0; i < packet.key.size(); i++)
         {
             _socket->print(packet.key[i].c_str());
-            Serial.print(packet.key[i].c_str());
             _socket->print("=");
-            Serial.print("=");
             _socket->print(packet.val[i].c_str());
-            Serial.print(packet.val[i].c_str());
             _socket->print(" ");
-            Serial.print(" ");
         }
         _socket->print("\n");
-        Serial.print("\n");
     }
     return 1;
 }
@@ -234,7 +235,7 @@ bool CompanionSatellite::sendCommand(CompanionSatellitePacket2_t packet)
 void CompanionSatellite::addDevice()
 {
     Serial.println("addDevice()");
-    CompanionSatellitePacket2_t pack;
+    CompanionSatellitePacket_t pack;
     pack.cmd = "ADD-DEVICE";
     pack.key.push_back(std::string("DEVICEID"));
     pack.val.push_back(std::string("00000"));
@@ -243,7 +244,7 @@ void CompanionSatellite::addDevice()
     pack.val.push_back(std::string("\"Satellite Arduino\""));
 
     pack.key.push_back(std::string("KEYS_TOTAL"));
-    pack.val.push_back(std::string("2"));
+    pack.val.push_back(std::string("4"));
 
     pack.key.push_back(std::string("KEYS_PER_ROW"));
     pack.val.push_back(std::string("2"));
@@ -260,15 +261,65 @@ void CompanionSatellite::addDevice()
     sendCommand(pack);
 }
 
+void CompanionSatellite::quit(boolean reconnect)
+{
+    Serial.println("quit()");
+    CompanionSatellitePacket_t pack;
+    pack.cmd = "QUIT";
+    sendCommand(pack);
+
+    if (reconnect)
+        addDevice();
+}
+
+void CompanionSatellite::keyPress(uint8_t key, uint8_t state)
+{
+    if (_status == CompanionSatelliteStatus::Connected)
+    {
+        CompanionSatellitePacket_t pack;
+        pack.cmd = "KEY-PRESS";
+        pack.key.push_back(std::string("DEVICEID"));
+        pack.val.push_back(std::string("00000"));
+
+        pack.key.push_back(std::string("KEY"));
+        char buf[18];
+        itoa(key, buf, 10);
+        pack.val.push_back(std::string(buf));
+
+        pack.key.push_back(std::string("PRESSED"));
+        switch (state)
+        {
+        case 1:
+            pack.val.push_back(std::string("true"));
+            break;
+        case 2:
+        case 0:
+            pack.val.push_back(std::string("false"));
+            break;
+        }
+        sendCommand(pack);
+    }
+}
+
 int CompanionSatellite::maintain()
 {
-    _pack = readPacket();
+    readPacket();
+
+    if (!_cmdIn.empty())
+    {
+        Serial.print("cmd in que");
+        Serial.println(_cmdIn.front().cmd.c_str());
+    }
 
     switch (_status)
     {
     case CompanionSatelliteStatus::NoConnection:
         if (_timeout > RECONNECT_DELAY)
+        {
+            Serial.println("timeout");
             _status = CompanionSatelliteStatus::Starting;
+            _timeout = 0;
+        }
         break;
     case CompanionSatelliteStatus::Starting:
     {
@@ -287,8 +338,6 @@ int CompanionSatellite::maintain()
     {
         if (!_cmdIn.empty())
         {
-            CompanionSatellitePacket2_t p = _cmdIn.front();
-            Serial.println(_cmdIn.front().cmd.c_str());
             if (_cmdIn.front().cmd.compare("BEGIN") == 0 && _cmdIn.front().key[0].compare("Companion") == 0 && _cmdIn.front().key[1].compare("Version") == 0)
             {
                 Serial.println("begin match");
@@ -308,18 +357,55 @@ int CompanionSatellite::maintain()
         }
 
         if (_timeout > RECONNECT_DELAY)
+        {
+            Serial.println("timeout");
+            _timeout = 0;
             _status = CompanionSatelliteStatus::Starting;
+        }
         break;
     }
     case CompanionSatelliteStatus::AddingDevice:
     {
-        if (_pack.cmd.compare("ADD-DEVICE"))
+        if (!_cmdIn.empty())
         {
-            // parseParameters();
+            if (_cmdIn.front().cmd.compare("ADD-DEVICE") == 0)
+            {
+                if (_cmdIn.front().key[0].compare("OK") == 0)
+                    _status = CompanionSatelliteStatus::Connected;
+                else if (_cmdIn.front().key[0].compare("ERROR") == 0)
+                {
+                    Serial.println(_cmdIn.front().val[1].c_str());
+                    quit(true);
+                }
+            }
+            _cmdIn.pop();
         }
-        // if (_timeout > RECONNECT_DELAY)
-        //     _status = CompanionSatelliteStatus::Starting;
+        if (_timeout > RECONNECT_DELAY)
+        {
+            Serial.println("timeout");
+            _timeout = 0;
+            _status = CompanionSatelliteStatus::Starting;
+        }
     }
+    case CompanionSatelliteStatus::Connected:
+        if (!_cmdIn.empty())
+        {
+            CompanionSatelliteCommand cmd = s_mapStringToCompanionSatelliteCommand[_cmdIn.front().cmd];
+            //TODO: Check device id
+            switch (cmd)
+            {
+            case CompanionSatelliteCommand::BRIGHTNESS:
+
+                break;
+            case CompanionSatelliteCommand::KEY_STATE:
+
+                break;
+            default:
+                break;
+            }
+            _cmdIn.pop();
+        }
+        break;
 
     default:
         break;
