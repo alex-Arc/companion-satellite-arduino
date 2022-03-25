@@ -9,7 +9,7 @@
 #include <Bounce.h>
 
 EthernetClient client;
-CompanionSatellite compSat(&client);
+CompanionSatellite compSat();
 
 const uint8_t NUM_BTNS = 8;
 
@@ -103,7 +103,6 @@ void setup()
   // give the Ethernet shield a second to initialize:
   delay(1000);
 
-  compSat.connect(IPAddress(172, 16, 3, 48));
 
   colorWipe(leds.Color(0, 0, 0), 10); // black
   leds.setBrightness(255);
@@ -113,20 +112,19 @@ void setup()
 void loop()
 {
 
-  compSat.maintain();
 
   for (int i = 0; i < NUM_BTNS; i++)
   { // button bounce update and state
     b_btn[i].update();
     if (b_btn[i].fallingEdge())
     {
-      compSat.keyPress(i, 1);
+
     }
     else if (b_btn[i].risingEdge())
     {
-      compSat.keyPress(i, 0);
+
     }
-    leds.setPixelColor(i, compSat.color[i]);
+    leds.setPixelColor(i, 0);
   }
   leds.show();
 }
