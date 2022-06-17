@@ -1,130 +1,96 @@
 #include <Arduino.h>
-#include <NativeEthernet.h>
-// #include <FastLED.h>
-#include <Adafruit_NeoPixel.h>
-#define Use_NativeEthernet
-// #define Use_QNEthernet
-// #define Use_Ethernet
 #include <CompanionSatellite.h>
-#include <Bounce.h>
+CompanionSatellite compSat;
 
-EthernetClient client;
-CompanionSatellite compSat();
+char *buff;
+
+#define ETH_CLK_MODE ETH_CLOCK_GPIO17_OUT
+#define ETH_PHY_POWER 12
+
+#include <ETH.h>
+
+static bool eth_connected = false;
+WiFiClient client;
 
 const uint8_t NUM_BTNS = 8;
 
-byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
 IPAddress ip(192, 168, 0, 177);
 IPAddress myDns(192, 168, 0, 1);
 
-Adafruit_NeoPixel leds = Adafruit_NeoPixel(NUM_BTNS, 39, NEO_GRB + NEO_KHZ800);
-
-// Fill the dots one after the other with a color
-void colorWipe(uint32_t c, uint8_t wait)
+void WiFiEvent(WiFiEvent_t event)
 {
-  for (uint16_t i = 0; i < leds.numPixels(); i++)
+  switch (event)
   {
-    leds.setPixelColor(i, c);
-    leds.show();
-    delay(wait);
+  case SYSTEM_EVENT_ETH_START:
+    Serial.println("ETH Started");
+    // set eth hostname here
+    ETH.setHostname("esp32-ethernet");
+    break;
+  case SYSTEM_EVENT_ETH_CONNECTED:
+    Serial.println("ETH Connected");
+    break;
+  case SYSTEM_EVENT_ETH_GOT_IP:
+    Serial.print("ETH MAC: ");
+    Serial.print(ETH.macAddress());
+    Serial.print(", IPv4: ");
+    Serial.print(ETH.localIP());
+    if (ETH.fullDuplex())
+    {
+      Serial.print(", FULL_DUPLEX");
+    }
+    Serial.print(", ");
+    Serial.print(ETH.linkSpeed());
+    Serial.println("Mbps");
+    eth_connected = true;
+    break;
+  case SYSTEM_EVENT_ETH_DISCONNECTED:
+    Serial.println("ETH Disconnected");
+    eth_connected = false;
+    break;
+  case SYSTEM_EVENT_ETH_STOP:
+    Serial.println("ETH Stopped");
+    eth_connected = false;
+    break;
+  default:
+    break;
   }
 }
 
-int buttons[] = {0, 1, 2, 3, 4, 5, 6, 9};
-
-Bounce b_btn[NUM_BTNS] = {
-    Bounce(buttons[0], 5),
-    Bounce(buttons[1], 5),
-    Bounce(buttons[2], 5),
-    Bounce(buttons[3], 5),
-    Bounce(buttons[4], 5),
-    Bounce(buttons[5], 5),
-    Bounce(buttons[6], 5),
-    Bounce(buttons[7], 5)};
-
-bool buttonState[NUM_BTNS] = {0, 0, 0, 0, 0, 0, 0, 0};
-
-bool change = false;
-
 void setup()
 {
-  // Open serial communications and wait for port to open:
   Serial.begin(9600);
   while (!Serial)
   {
     ; // wait for serial port to connect. Needed for native USB port only
   }
-  if (CrashReport)
+
+  WiFi.onEvent(WiFiEvent);
+  ETH.begin();
+  if (!ETH.config(IPAddress(192, 168, 0, 177), IPAddress(192, 168, 0, 1), IPAddress(255, 255, 255, 0)))
   {
-    Serial.print(CrashReport);
+    Serial.println("ETH: Error with setting static IP");
   }
 
-  leds.begin();
-  leds.setBrightness(255);
-  leds.show();                           // Initialize all pixels to 'off'
-  colorWipe(leds.Color(255, 0, 0), 100); // black
-  colorWipe(leds.Color(0, 255, 0), 100); // black
-  colorWipe(leds.Color(0, 0, 255), 100); // black
+  Serial.print("\nconnecting to ");
+  Serial.println(IPAddress(192, 168, 0, 10));
 
-  for (int i = 0; i < NUM_BTNS; i++)
-  {
-    pinMode(buttons[i], INPUT_PULLUP);
-  }
-
-  // try to congifure using IP address instead of DHCP:
-  // Ethernet.begin(mac); //, ip, myDns);
-  // start the Ethernet connection:
-  Serial.println("Initialize Ethernet with DHCP:");
-  if (Ethernet.begin(mac) == 0)
-  {
-    Serial.println("Failed to configure Ethernet using DHCP");
-    // Check for Ethernet hardware present
-    if (Ethernet.hardwareStatus() == EthernetNoHardware)
-    {
-      Serial.println("Ethernet shield was not found.  Sorry, can't run without hardware. :(");
-      while (true)
-      {
-        delay(1); // do nothing, no point running without Ethernet hardware
-      }
-    }
-    if (Ethernet.linkStatus() == LinkOFF)
-    {
-      Serial.println("Ethernet cable is not connected.");
-    }
-    // try to congifure using IP address instead of DHCP:
-    Ethernet.begin(mac, ip, myDns);
-  }
-  else
-  {
-    Serial.print("  DHCP assigned IP ");
-    Serial.println(Ethernet.localIP());
-  }
-
-  // give the Ethernet shield a second to initialize:
-  delay(1000);
-
-
-  colorWipe(leds.Color(0, 0, 0), 10); // black
-  leds.setBrightness(255);
+  client.connect(IPAddress(192, 168, 0, 10), 16622);
+  delay(5);
 }
 
-// comp.connect(IPAddress(192,168,0,2));
 void loop()
 {
-
-
-  for (int i = 0; i < NUM_BTNS; i++)
-  { // button bounce update and state
-    b_btn[i].update();
-    if (b_btn[i].fallingEdge())
+  if (!compSat.connected())
+  {
+    int n = client.available();
+    if (n)
     {
+      buff = (char *)malloc(n + 1);
+      client.read((uint8_t *)buff, n);
+      // Serial.printf("%.*s \n", n, buff);
 
+      compSat.initialize(buff, n);
     }
-    else if (b_btn[i].risingEdge())
-    {
-
-    }
-    leds.setPixelColor(i, 0);
   }
-  leds.show();
+  delay(50000);
 }
