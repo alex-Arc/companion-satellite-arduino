@@ -19,36 +19,93 @@ private:
         OPEN
     } ConnectionState;
 
-    ConnectionState _state = CLOSED;
+    typedef enum
+    {
+        BEGIN,
+        QUIT,
+        PING,
+        PONG,
+        NUMBER_OF_COMMANDS,
+        NONE
+    } CMD;
+    std::array<std::string, CMD::NUMBER_OF_COMMANDS> commandList = {
+        "BEGIN", "QUIT", "PING", "PONG"};
+
+    typedef enum
+    {
+        CompanionVersion,
+        ApiVersion,
+        DEVICEID,
+        PRODUCT_NAME,
+        KEYS_TOTAL,
+        BITMAPS,
+        COLORS,
+        TEXT,
+        KEYS_PER_ROW,
+        KEY,
+        PRESSED,
+        TYPE,
+        VALUE,
+        NUMBER_OF_ARGS,
+        NONE_ARG
+    } ARG;
+
+    std::array<std::string, ARG::NUMBER_OF_ARGS> argList = {
+        "CompanionVersion",
+        "ApiVersion",
+        "DEVICEID",
+        "PRODUCT_NAME",
+        "KEYS_TOTAL",
+        "BITMAPS",
+        "COLORS",
+        "TEXT",
+        "KEYS_PER_ROW",
+        "KEY",
+        "PRESSED",
+        "TYPE",
+        "VALUE"};
+
+    ConnectionState _state = ConnectionState::CLOSED;
 
     char *_command;
     char *_values[MAX_ARGS];
-    bool phrasesCommand(char *buf, uint8_t len);
 
-    // char *findArray();
+    CMD _cmd;
+    ARG _arg;
+    ARG _val;
 
-    std::array<std::string, 4> commandList = {"BEGIN", "QUIT", "PING", "PONG"};
+    std::string::iterator phraseCommand(std::string *input, std::string::iterator offset);
+    std::string::iterator phraseArgVal(std::string *input, std::string::iterator offset);
 
 public:
     const char *initialize(char *buf, uint8_t len);
+    const char *maintain();
     bool connected();
 };
 
 const char *CompanionSatellite::initialize(char *buf, uint8_t len)
 {
-    if (_state != CompanionSatellite::ConnectionState::CLOSED)
+    if (_state != ConnectionState::CLOSED)
     {
         // TODO: close connection
     }
 
-    phrasesCommand(buf, len);
+    std::string input(buf, len);
+    Serial.printf("All >%s<\n", input.data());
+
+    auto itr = phraseCommand(&input, input.begin());
+    Serial.printf("COMMAND: %d\n", _cmd);
+    itr = phraseArgVal(&input, itr);
+    Serial.printf("ARG: %d\n", _arg);
+    itr = phraseArgVal(&input, itr);
+    Serial.printf("ARG: %d\n", _arg);
 
     return nullptr;
 }
 
 bool CompanionSatellite::connected()
 {
-    if (_state == CompanionSatellite::ConnectionState::OPEN)
+    if (_state == ConnectionState::OPEN)
     {
         return true;
     }
@@ -58,94 +115,69 @@ bool CompanionSatellite::connected()
     }
 }
 
-bool CompanionSatellite::phrasesCommand(char *buf, uint8_t len)
+std::string::iterator CompanionSatellite::phraseCommand(std::string *input, std::string::iterator offset)
 {
-    std::string input(buf, len);
-    Serial.printf("All >%s<\n", input.c_str());
 
     // CMD
-    auto space = std::find(input.begin(), input.end(), ' ');
-    if (space == input.end())
-        return 0;
-
-    Serial.printf("Command >%.*s<\n", distance(input.begin(), space), input.data());
+    auto space = std::find(input->begin(), input->end(), ' ');
+    if (space == input->end())
+    {
+        _cmd = CMD::NONE;
+        return input->end();
+    }
 
     *space = 0;
-    auto cmd_itr = std::find(std::begin(commandList), std::end(commandList), input.data());
-    if (cmd_itr != std::end(commandList))
+    auto cmd_itr = std::find(commandList.begin(), commandList.end(), input->data());
+    // TODO: not end test nessesary
+    if (cmd_itr != commandList.end())
     {
-        Serial.printf("Element %s at %d\n", input.c_str(), distance(std::begin(commandList), cmd_itr));
+        _cmd = (CMD)(distance(commandList.begin(), cmd_itr));
+        return std::next(space);
     }
     else
     {
-        Serial.println("Element is not present in the given array");
-        return 0;
+        _cmd = CMD::NONE;
+        return input->end();
+    }
+}
+
+std::string::iterator CompanionSatellite::phraseArgVal(std::string *input, std::string::iterator offset)
+{
+    // ARG
+    auto equal = std::find(offset, input->end(), '=');
+    if (equal == input->end())
+    {
+        _arg = ARG::NONE_ARG;
+        Serial.println("no arg");
+
+        return input->end();
     }
 
-    // ARG
-    auto equal = std::find(space, input.end(), '=');
-    if (equal == input.end())
-        return 0;
+    Serial.printf("Arg >%.*s<\n", distance(offset, equal), offset);
 
-    Serial.printf("Arg >%.*s<\n", distance(space + 1, equal), space + 1);
+    auto arg_itr = std::find(argList.begin(), argList.end(), std::string(offset, equal));
+    // TODO: not end test nessesary
+    if (arg_itr != argList.end())
+    {
+        _arg = (ARG)(distance(argList.begin(), arg_itr));
+    }
+    else
+    {
+        _arg = ARG::NONE_ARG;
+        Serial.println("no arg match");
+        return input->end();
+    }
 
     // VAL
-    space = std::find(equal, input.end(), ' ');
-    if (space == input.end())
-        return 0;
+    std::advance(equal, 1);
+    auto space = std::find(equal, input->end(), ' ');
+    if (space == input->end())
+    {
+        std::advance(space, -1);
+    }
+    Serial.printf("Val >%.*s<\n", distance(equal, space), equal);
 
-    Serial.printf("Val >%.*s<\n", distance(equal + 1, space), equal + 1);
-
-    // std::string arg = input.substr(space + 1, std::distance(space, equal));
-    // Serial.printf("Arg >%s<\n", arg.c_str());
-
-    /*
-        Serial.printf("All >%.*s<\n", len, buf);
-        char *lf, *equal, *space;
-
-        lf = (char *)memchr(buf, '\n', len);
-
-        if (lf == nullptr)
-        {
-            return false;
-        }
-
-        space = (char *)memchr(buf, ' ', len);
-
-        Serial.printf("Command >%.*s<\n", space - buf, buf);
-
-        *space = 0;
-
-        auto itr = std::find(std::begin(commandList), std::end(commandList), buf);
-
-        if (itr != std::end(commandList))
-        {
-            Serial.printf("Element %s at %d\n", buf, distance(std::begin(commandList), itr));
-        }
-        else
-        {
-            Serial.println("Element is not present in the given array");
-            return 0;
-        }
-
-        for (int i = 0; i < MAX_ARGS; i++)
-        {
-            equal = (char *)memchr(space, '=', len - (space - buf));
-            Serial.printf("Arg >%.*s< ", equal - space - 1, space + 1);
-
-            space = (char *)memchr(equal, ' ', len - (equal - buf));
-            if (space != nullptr)
-            {
-                Serial.printf("Val >%.*s<\n", space - equal - 1, equal + 1);
-            }
-            else
-            {
-                Serial.printf("Val >%.*s<\n", lf - equal - 1, equal + 1);
-                break;
-            }
-        }
-    */
-    return 0;
+    return std::next(space);
 }
 
 #endif
