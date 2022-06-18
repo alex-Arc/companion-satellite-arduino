@@ -6,6 +6,7 @@
 #include <string>
 #include <algorithm>
 #include <iterator>
+#include <map>
 
 const int MAX_ARGS = 8;
 
@@ -19,20 +20,18 @@ private:
         OPEN
     } ConnectionState;
 
-    typedef enum
+    enum CMD
     {
-        BEGIN,
+        NONE_CMD = -1,
         QUIT,
         PING,
         PONG,
-        NUMBER_OF_COMMANDS,
-        NONE
-    } CMD;
-    std::array<std::string, CMD::NUMBER_OF_COMMANDS> commandList = {
-        "BEGIN", "QUIT", "PING", "PONG"};
+        BEGIN
+    };
 
     typedef enum
     {
+        NONE_ARG = -1,
         CompanionVersion,
         ApiVersion,
         DEVICEID,
@@ -47,35 +46,33 @@ private:
         TYPE,
         VALUE,
         NUMBER_OF_ARGS,
-        NONE_ARG
     } ARG;
 
-    std::array<std::string, ARG::NUMBER_OF_ARGS> argList = {
-        "CompanionVersion",
-        "ApiVersion",
-        "DEVICEID",
-        "PRODUCT_NAME",
-        "KEYS_TOTAL",
-        "BITMAPS",
-        "COLORS",
-        "TEXT",
-        "KEYS_PER_ROW",
-        "KEY",
-        "PRESSED",
-        "TYPE",
-        "VALUE"};
+    std::map<std::string, int> const stringToCommand = {
+        {"BEGIN", CMD::BEGIN},
+        {"QUIT", CMD::QUIT},
+        {"PING", CMD::PING},
+        {"PONG", CMD::PONG},
+    };
+
+    std::map<std::string, ARG> const stringToArg = {
+        {"CompanionVersion", ARG::CompanionVersion},
+        {"ApiVersion", ARG::ApiVersion},
+        {"DEVICEID", ARG::DEVICEID},
+    };
 
     ConnectionState _state = ConnectionState::CLOSED;
 
     char *_command;
     char *_values[MAX_ARGS];
 
-    CMD _cmd;
-    ARG _arg;
-    ARG _val;
 
-    std::string::iterator phraseCommand(std::string *input, std::string::iterator offset);
-    std::string::iterator phraseArgVal(std::string *input, std::string::iterator offset);
+
+    std::string *_buffer;
+    std::string::iterator _offset;
+
+    int findElement(char key, std::map<std::string, int> map, bool allowEnd = false);
+
 
 public:
     const char *initialize(char *buf, uint8_t len);
@@ -91,14 +88,30 @@ const char *CompanionSatellite::initialize(char *buf, uint8_t len)
     }
 
     std::string input(buf, len);
-    Serial.printf("All >%s<\n", input.data());
+    _buffer = &input;
+    Serial.printf("All >%s<\n", _buffer->data());
+    _offset = _buffer->begin();
 
-    auto itr = phraseCommand(&input, input.begin());
-    Serial.printf("COMMAND: %d\n", _cmd);
-    itr = phraseArgVal(&input, itr);
-    Serial.printf("ARG: %d\n", _arg);
-    itr = phraseArgVal(&input, itr);
-    Serial.printf("ARG: %d\n", _arg);
+    switch ((CMD)findElement(' ', stringToCommand))
+    {
+    case CMD::BEGIN:
+        Serial.printf("CMD: BEGIN");
+        break;
+    case CMD::NONE_CMD:
+        Serial.printf("CMD: NONE");
+        break;
+    default:
+        Serial.printf("CMD: default");
+        break;
+    }
+
+    // CMD cmms = phraseCommand();
+    // Serial.printf("COMMAND: %d\n", cmms);
+
+    // itr = phraseArgVal(&input, itr);
+    // Serial.printf("ARG: %d\n", _arg);
+    // itr = phraseArgVal(&input, itr);
+    // Serial.printf("ARG: %d\n", _arg);
 
     return nullptr;
 }
@@ -115,69 +128,21 @@ bool CompanionSatellite::connected()
     }
 }
 
-std::string::iterator CompanionSatellite::phraseCommand(std::string *input, std::string::iterator offset)
+int CompanionSatellite::findElement(char key, std::map<std::string, int> map, bool allowEnd)
 {
-
-    // CMD
-    auto space = std::find(input->begin(), input->end(), ' ');
-    if (space == input->end())
+    auto out_itr = std::find(_offset, _buffer->end(), key);
+    auto map_itr = map.find(std::string(_offset, out_itr));
+    _offset = out_itr;
+    if (map_itr != map.end())
     {
-        _cmd = CMD::NONE;
-        return input->end();
-    }
-
-    *space = 0;
-    auto cmd_itr = std::find(commandList.begin(), commandList.end(), input->data());
-    // TODO: not end test nessesary
-    if (cmd_itr != commandList.end())
-    {
-        _cmd = (CMD)(distance(commandList.begin(), cmd_itr));
-        return std::next(space);
+        Serial.printf("map: %d\n", map_itr->second);
+        return map_itr->second;
     }
     else
     {
-        _cmd = CMD::NONE;
-        return input->end();
+        return -1;
     }
 }
 
-std::string::iterator CompanionSatellite::phraseArgVal(std::string *input, std::string::iterator offset)
-{
-    // ARG
-    auto equal = std::find(offset, input->end(), '=');
-    if (equal == input->end())
-    {
-        _arg = ARG::NONE_ARG;
-        Serial.println("no arg");
-
-        return input->end();
-    }
-
-    Serial.printf("Arg >%.*s<\n", distance(offset, equal), offset);
-
-    auto arg_itr = std::find(argList.begin(), argList.end(), std::string(offset, equal));
-    // TODO: not end test nessesary
-    if (arg_itr != argList.end())
-    {
-        _arg = (ARG)(distance(argList.begin(), arg_itr));
-    }
-    else
-    {
-        _arg = ARG::NONE_ARG;
-        Serial.println("no arg match");
-        return input->end();
-    }
-
-    // VAL
-    std::advance(equal, 1);
-    auto space = std::find(equal, input->end(), ' ');
-    if (space == input->end())
-    {
-        std::advance(space, -1);
-    }
-    Serial.printf("Val >%.*s<\n", distance(equal, space), equal);
-
-    return std::next(space);
-}
 
 #endif
