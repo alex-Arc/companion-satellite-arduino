@@ -80,17 +80,20 @@ void setup()
 
 void loop()
 {
-  if (!compSat.connected())
-  {
-    int n = client.available();
-    if (n)
-    {
-      buff = (char *)malloc(n + 1);
-      client.read((uint8_t *)buff, n);
-      // Serial.printf("%.*s \n", n, buff);
 
-      compSat.initialize(buff, n);
+  int n = client.available();
+  if (n)
+  {
+    buff = (char *)malloc(n + 1);
+    client.read((uint8_t *)buff, n);
+    // Serial.printf("%.*s \n", n, buff);
+
+    const char *ret = compSat.initialize(buff, n);
+    if (ret != nullptr)
+    {
+      client.write(ret);
     }
   }
-  delay(50000);
+
+  delay(10);
 }
