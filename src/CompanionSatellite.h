@@ -114,7 +114,7 @@ void CompanionSatellite::_handleReceivedData(char *data)
 void CompanionSatellite::handleCommand(std::string line)
 {
     size_t i = line.find_first_of(' ');
-    std::string cmd = (i == std::string::npos) ? line : line.substr(0, i - 1);
+    std::string cmd = (i == std::string::npos) ? line : line.substr(0, i);
     std::string body = (i == std::string::npos) ? "" : line.substr(i + 1);
 
     Serial.printf("CMD: >%s<\tBODY: >%s<\n", cmd.data(), body.data());
