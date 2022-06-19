@@ -84,10 +84,16 @@ void loop()
   int n = client.available();
   if (n)
   {
+    long int t1 = millis();
+
     buff = (char *)malloc(n + 1);
     client.read((uint8_t *)buff, n);
     // Serial.printf("%.*s \n", n, buff);
 
+    compSat._handleReceivedData(buff);
+
+    long int t2 = millis();
+    Serial.printf("exec time: %d ms\n", t2-t1);
 
   }
 
