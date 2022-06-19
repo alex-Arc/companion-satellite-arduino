@@ -72,7 +72,7 @@ std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(st
         if (size_t equals = fragment.find_first_of('='); equals != std::string::npos)
         {
             p.key = fragment.substr(0, equals);
-            p.val = fragment.substr(equals);
+            p.val = fragment.substr(equals+1);
             res.push_back(p);
         }
         else
