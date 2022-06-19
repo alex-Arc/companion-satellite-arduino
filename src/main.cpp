@@ -88,11 +88,7 @@ void loop()
     client.read((uint8_t *)buff, n);
     // Serial.printf("%.*s \n", n, buff);
 
-    const char *ret = compSat.initialize(buff, n);
-    if (ret != nullptr)
-    {
-      client.write(ret);
-    }
+
   }
 
   delay(10);
