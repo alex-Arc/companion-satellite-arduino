@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include <string>
 #include <vector>
-// #include <array>
+#include <list>
 #include <algorithm>
 // #include <iterator>
 // #include <map>
@@ -14,20 +14,20 @@ class CompanionSatellite
 private:
     struct DeviceDrawProps
     {
-        std::string deviceId = "1234";
-        int keyIndex = 2;
-        bool image = false;
-        bool color = false;
-        bool text = false;
+        std::string deviceId;
+        int keyIndex;
+        std::string image;
+        std::string color;
+        std::string text;
     };
 
     struct DeviceRegisterProps
     {
         int keysTotal = 2;
-        int keysPerRow = 8;
+        int keysPerRow = 2;
         bool bitmaps = false;
-        bool colours = false;
-        bool text = false;
+        bool color = false;
+        bool text = true;
     };
 
     DeviceRegisterProps prop;
@@ -57,10 +57,13 @@ private:
 
     void addDevice(std::string deviceId, std::string productName, CompanionSatellite::DeviceRegisterProps props);
     void handleAddedDevice(std::vector<parm> params);
+    void handleState(std::vector<parm> params);
 
 public:
     bool _connected = false;
+    bool _deviceStatus = false;
     std::string transmitBuffer;
+    std::list<DeviceDrawProps> drawQueue;
 
     void _handleReceivedData(char *data);
     bool connected();
@@ -119,7 +122,7 @@ std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(st
             res.push_back(p);
         }
 
-        Serial.printf("KEY: >%s< VAL: >%s<\n", p.key.data(), p.val.data());
+        // Serial.printf("KEY: >%s< VAL: >%s<\n", p.key.data(), p.val.data());
     }
     return res;
 }
@@ -139,7 +142,8 @@ void CompanionSatellite::_handleReceivedData(char *data)
         // Serial.printf("LINE >%s<\n", line.data());
         this->handleCommand(line); // TODO: remove potential \r
     }
-    this->receiveBuffer.erase(0, offset);
+    // this->receiveBuffer.erase(0, offset); //FIX
+    this->receiveBuffer.clear();
 }
 
 void CompanionSatellite::handleCommand(std::string line)
@@ -157,29 +161,29 @@ void CompanionSatellite::handleCommand(std::string line)
     switch (distance(commandList.begin(), cmd_index))
     {
     case 0: // PING
-        Serial.printf("PING device: %s\n", body.data());
+        Serial.printf("PING %s\n", body.data());
         // this.socket?.write(`PONG ${body}\n`)
         break;
     case 1: //'PONG':
         // console.log('Got pong')
-        Serial.printf("PONG device: %s\n", body.data());
+        Serial.printf("PONG %s\n", body.data());
         // this._pingUnackedCount = 0
         break;
     case 2: //'KEY-STATE':
-        Serial.printf("KEY-STATE device: %s\n", body.data());
-        // this.handleState(params)
+        // Serial.printf("KEY-STATE %s\n", body.data());
+        this->handleState(params);
         break;
     case 3: //'KEYS-CLEAR':
-        Serial.printf("KEYS-CLEAR device: %s\n", body.data());
+        Serial.printf("KEYS-CLEAR %s\n", body.data());
         // this.handleClear(params)
         break;
     case 4: //'BRIGHTNESS':
-        Serial.printf("BRIGHTNESS device: %s\n", body.data());
+        Serial.printf("BRIGHTNESS %s\n", body.data());
         // this.handleBrightness(params)
         break;
     case 5: //'ADD-DEVICE':
-        Serial.printf("ADD-DEVICE: %s\n", body.data());
-        // this.handleAddedDevice(params)
+        // Serial.printf("ADD-DEVICE: %s\n", body.data());
+        this->handleAddedDevice(params);
         break;
     case 6: //'REMOVE-DEVICE':
         Serial.printf("REMOVE-DEVICE: %s\n", body.data());
@@ -202,6 +206,56 @@ void CompanionSatellite::handleCommand(std::string line)
     }
 }
 
+void CompanionSatellite::handleState(std::vector<parm> params)
+{
+    if (params[0].key != "DEVICEID")
+    {
+        Serial.printf("Mising DEVICEID in KEY-DRAW response");
+        return;
+    }
+    if (params[1].key != "KEY")
+    {
+        Serial.printf("Mising KEY in KEY-DRAW response");
+        return;
+    }
+
+    try
+    {
+        const int keyIndex = std::stoi(params[1].val);
+    }
+    catch (const std::invalid_argument &ia)
+    {
+        Serial.printf("Bad KEY in KEY-DRAW response: %s\n", ia.what());
+        return;
+    }
+
+    this->drawQueue.push_back(DeviceDrawProps());
+
+    this->drawQueue.back().keyIndex = std::stod(params[1].val);
+
+    for (auto it = params.begin() + 2; it != params.end(); ++it)
+    {
+        if (this->prop.bitmaps && it->key == "BITMAP")
+        {
+            this->drawQueue.back().image = it->val;
+        }
+        else if (this->prop.color && it->key == "COLOR")
+        {
+            this->drawQueue.back().color = it->val;
+        }
+        else if (this->prop.text && it->key == "TEXT")
+        {
+            this->drawQueue.back().text = it->val;
+        }
+    }
+
+    // const image = typeof params.BITMAP === 'string' ? Buffer.from(params.BITMAP, 'base64') : undefined
+    // 	const text = typeof params.TEXT === 'string' ? Buffer.from(params.TEXT, 'base64').toString() : undefined
+    // 	const color = typeof params.COLOR === 'string' ? params.COLOR : undefined
+
+    // 	this.emit('draw', { deviceId: params.DEVICEID, keyIndex, image, text, color })
+}
+
 void CompanionSatellite::addDevice(std::string deviceId, std::string productName, CompanionSatellite::DeviceRegisterProps props)
 {
     if (this->_connected)
@@ -212,7 +266,7 @@ void CompanionSatellite::addDevice(std::string deviceId, std::string productName
             "\" KEYS_TOTAL=" + std::to_string(props.keysTotal) +
             " KEYS_PER_ROW=" + std::to_string(props.keysPerRow) +
             " BITMAPS=" + ((props.bitmaps) ? "1" : "0") +
-            " COLORS=" + ((props.colours) ? "1" : "0") +
+            " COLORS=" + ((props.color) ? "1" : "0") +
             " TEXT=" + ((props.text) ? "1" : "0") + "\n");
     }
 }
@@ -237,10 +291,13 @@ void CompanionSatellite::handleAddedDevice(std::vector<parm> params)
         // }
         return;
     }
-    if (typeof params.DEVICEID != = 'string')
+    if (params[1].key != "DEVICEID")
     {
-        console.log('Mising DEVICEID in ADD-DEVICE response') return;
+        Serial.printf("Mising DEVICEID in ADD-DEVICE response");
+        return;
     }
+
+    _deviceStatus = true;
 
     // this.emit('newDevice', { deviceId: params.DEVICEID })
 }

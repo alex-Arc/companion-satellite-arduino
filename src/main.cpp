@@ -101,6 +101,15 @@ void loop()
       client.write(compSat.transmitBuffer.data());
       compSat.transmitBuffer.clear();
     }
+
+    if (!compSat.drawQueue.empty())
+    {
+      while (!compSat.drawQueue.empty())
+      {
+        Serial.printf("draw id: %s index %d color %s image %s text %s", compSat.drawQueue.front().deviceId.data(), compSat.drawQueue.front().keyIndex, compSat.drawQueue.front().color.data(), compSat.drawQueue.front().image.data(), compSat.drawQueue.front().text.data());
+        compSat.drawQueue.pop_front();
+      }
+    }
   }
 
   delay(10);
