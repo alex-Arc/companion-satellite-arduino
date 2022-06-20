@@ -9,6 +9,8 @@
 // #include <iterator>
 // #include <map>
 
+#include <B64.h>
+
 class CompanionSatellite
 {
 private:
@@ -245,7 +247,7 @@ void CompanionSatellite::handleState(std::vector<parm> params)
         }
         else if (this->prop.text && it->key == "TEXT")
         {
-            this->drawQueue.back().text = it->val;
+            this->drawQueue.back().text = B64::decode(it->val);
         }
     }
 
