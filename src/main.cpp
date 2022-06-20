@@ -93,8 +93,14 @@ void loop()
     compSat._handleReceivedData(buff);
 
     long int t2 = millis();
-    Serial.printf("exec time: %d ms\n", t2-t1);
+    Serial.printf("exec time: %d ms\n", t2 - t1);
 
+    if (!compSat.transmitBuffer.empty())
+    {
+      Serial.printf("TX: >%s<\n", compSat.transmitBuffer.data());
+      client.write(compSat.transmitBuffer.data());
+      compSat.transmitBuffer.clear();
+    }
   }
 
   delay(10);
