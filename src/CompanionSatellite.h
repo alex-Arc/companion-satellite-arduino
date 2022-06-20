@@ -9,6 +9,9 @@
 // #include <iterator>
 // #include <map>
 
+#include <string_view>
+#include <charconv>
+
 #include <B64.h>
 
 class CompanionSatellite
@@ -35,16 +38,16 @@ private:
     DeviceRegisterProps prop;
 
     unsigned long _lastReceivedAt;
-    std::string receiveBuffer;
+    std::string_view receiveBuffer;
 
     struct parm
     {
-        std::string key;
-        std::string val;
+        std::string_view key;
+        std::string_view val;
     };
 
-    std::vector<parm> parseLineParameters(std::string line);
-    void handleCommand(std::string line);
+    std::vector<parm> parseLineParameters(std::string_view line);
+    void handleCommand(std::string_view line);
 
     const std::vector<std::string> commandList = {
         "PING",
@@ -75,7 +78,7 @@ public:
     void keyUp(std::string deviceId, int keyIndex);
 };
 
-std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(std::string line)
+std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(std::string_view line)
 {
     // https://newbedev.com/javascript-split-string-by-space-but-ignore-space-in-quotes-notice-not-to-split-by-the-colon-too
     // const match = line.match(/\\?.|^$/g);
@@ -102,8 +105,9 @@ std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(st
         */
     // }
 
-    std::vector<std::string> fragments;
+    std::vector<std::string_view> fragments;
     size_t offset = 0;
+
     for (size_t space = line.find_first_of(' ', offset); space != std::string::npos; space = line.find_first_of(' ', offset))
     {
         fragments.push_back(line.substr(offset, space - offset));
@@ -136,27 +140,26 @@ std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(st
 void CompanionSatellite::_handleReceivedData(char *data)
 {
     this->_lastReceivedAt = millis();
-    this->receiveBuffer += std::string(data);
+    this->receiveBuffer = std::string_view(data);
     // Serial.printf("data >%s<\n", this->receiveBuffer.data());
 
     size_t i;
     int offset = 0;
     while ((i = this->receiveBuffer.find_first_of('\n', offset)) != std::string::npos)
     {
-        std::string line = this->receiveBuffer.substr(offset, i - offset);
+        std::string_view line = this->receiveBuffer.substr(offset, i - offset);
         offset = i + 1;
         // Serial.printf("LINE >%s<\n", line.data());
         this->handleCommand(line); // TODO: remove potential \r
     }
     // this->receiveBuffer.erase(0, offset); //FIX
-    this->receiveBuffer.clear();
 }
 
-void CompanionSatellite::handleCommand(std::string line)
+void CompanionSatellite::handleCommand(std::string_view line)
 {
     size_t i = line.find_first_of(' ');
-    std::string cmd = (i == std::string::npos) ? line : line.substr(0, i);
-    std::string body = (i == std::string::npos) ? "" : line.substr(i + 1);
+    std::string_view cmd = (i == std::string::npos) ? line : line.substr(0, i);
+    std::string_view body = (i == std::string::npos) ? "" : line.substr(i + 1);
 
     // Serial.printf("CMD: >%s<\tBODY: >%s<\n", cmd.data(), body.data());
 
@@ -225,12 +228,15 @@ void CompanionSatellite::handleState(std::vector<parm> params)
         return;
     }
 
-    try
+    int keyIndex{};
+
+    auto [ptr, ec]{std::from_chars(params[1].val.data(), params[1].val.data() + params[1].val.size(), keyIndex)};
+
+    if (ec == std::errc())
     {
-        const int keyIndex = std::stoi(params[1].val);
         this->drawQueue.push_back(DeviceDrawProps());
 
-        this->drawQueue.back().keyIndex = std::stod(params[1].val);
+        this->drawQueue.back().keyIndex = keyIndex;
 
         for (auto it = params.begin() + 2; it != params.end(); ++it)
         {
@@ -248,9 +254,9 @@ void CompanionSatellite::handleState(std::vector<parm> params)
             }
         }
     }
-    catch (const std::invalid_argument &ia)
+    else
     {
-        Serial.printf("Bad KEY in KEY-DRAW response: %s\n", ia.what());
+        Serial.printf("Bad KEY in KEY-DRAW response\n");
         return;
     }
 
@@ -276,14 +282,16 @@ void CompanionSatellite::handleBrightness(std::vector<parm> params)
         Serial.printf("Mising VALUE in BRIGHTNESS response\n");
         return;
     }
-    try
+    int percent{};
+    auto [ptr, ec]{std::from_chars(params[1].val.data(), params[1].val.data() + params[1].val.size(), percent)};
+
+    if (ec == std::errc())
     {
-        const int percent = std::stoi(params[1].val);
         Serial.printf("BRIGHTNESS: %d\n", percent);
     }
-    catch (const std::invalid_argument &ia)
+    else
     {
-        Serial.printf("Bad VALUE in BRIGHTNESS\n", ia.what());
+        Serial.printf("Bad VALUE in BRIGHTNESS\n");
         return;
     }
 

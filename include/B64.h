@@ -11,6 +11,7 @@
 #define B64_h
 
 #include <string>
+#include <string_view>
 
 namespace B64
 {
@@ -95,6 +96,11 @@ namespace B64
     static std::string decode(const std::string &str64)
     {
         return decode(str64.c_str(), str64.size());
+    }
+
+    static std::string decode(const std::string_view str64)
+    {
+        return decode(str64.data(), str64.size());
     }
 };
 
