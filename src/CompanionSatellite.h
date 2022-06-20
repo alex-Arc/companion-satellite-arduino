@@ -60,6 +60,7 @@ private:
     void addDevice(std::string deviceId, std::string productName, CompanionSatellite::DeviceRegisterProps props);
     void handleAddedDevice(std::vector<parm> params);
     void handleState(std::vector<parm> params);
+    void handleBrightness(std::vector<parm> params);
 
 public:
     bool _connected = false;
@@ -180,8 +181,8 @@ void CompanionSatellite::handleCommand(std::string line)
         // this.handleClear(params)
         break;
     case 4: //'BRIGHTNESS':
-        Serial.printf("BRIGHTNESS %s\n", body.data());
-        // this.handleBrightness(params)
+        // Serial.printf("BRIGHTNESS %s\n", body.data());
+        this->handleBrightness(params);
         break;
     case 5: //'ADD-DEVICE':
         // Serial.printf("ADD-DEVICE: %s\n", body.data());
@@ -250,6 +251,12 @@ void CompanionSatellite::handleState(std::vector<parm> params)
             this->drawQueue.back().text = B64::decode(it->val);
         }
     }
+    }
+    catch (const std::invalid_argument &ia)
+    {
+        Serial.printf("Bad KEY in KEY-DRAW response: %s\n", ia.what());
+        return;
+    }
 
     // const image = typeof params.BITMAP === 'string' ? Buffer.from(params.BITMAP, 'base64') : undefined
     // 	const text = typeof params.TEXT === 'string' ? Buffer.from(params.TEXT, 'base64').toString() : undefined
@@ -257,6 +264,46 @@ void CompanionSatellite::handleState(std::vector<parm> params)
 
     // 	this.emit('draw', { deviceId: params.DEVICEID, keyIndex, image, text, color })
 }
+
+void CompanionSatellite::handleBrightness(std::vector<parm> params)
+{
+    // for (auto p : params)
+    //     Serial.printf("KEY: >%s< VAL: >%s<\n", p.key.data(), p.val.data());
+
+    if (params[0].key != "DEVICEID")
+    {
+        Serial.printf("Mising DEVICEID in BRIGHTNESS respons\ne");
+        return;
+    }
+    if (params[1].key != "VALUE")
+    {
+        Serial.printf("Mising VALUE in BRIGHTNESS response\n");
+        return;
+    }
+    try
+    {
+        const int percent = std::stoi(params[1].val);
+        Serial.printf("BRIGHTNESS: %d\n", percent);
+    }
+    catch (const std::invalid_argument &ia)
+    {
+        Serial.printf("Bad VALUE in BRIGHTNESS\n", ia.what());
+        return;
+    }
+
+    // this.emit('brightness', { deviceId: params.DEVICEID, percent })
+}
+
+// void CompanionSatellite::keyDown(std::string deviceId, keyIndex: number) {
+// 		if (this->_connected) {
+// 			this->transmitBuffer(`KEY-PRESS DEVICEID=${deviceId} KEY=${keyIndex} PRESSED=1\n`)
+// 		}
+// 	}
+// 	public keyUp(deviceId: string, keyIndex: number): void {
+// 		if (this._connected && this.socket) {
+// 			this.socket.write(`KEY-PRESS DEVICEID=${deviceId} KEY=${keyIndex} PRESSED=0\n`)
+// 		}
+// 	}
 
 void CompanionSatellite::addDevice(std::string deviceId, std::string productName, CompanionSatellite::DeviceRegisterProps props)
 {
