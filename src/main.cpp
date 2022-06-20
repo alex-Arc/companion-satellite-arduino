@@ -88,6 +88,7 @@ void setup()
 
 void loop()
 {
+  // client.connected()
 
   int n = client.available();
   if (n)
@@ -126,8 +127,8 @@ void loop()
     int deboucedInput = bounce.read();
 
     if (deboucedInput == LOW)
-    {
       compSat.keyDown("1234", 0);
-    }
+    else
+      compSat.keyUp("1234", 0);
   }
 }

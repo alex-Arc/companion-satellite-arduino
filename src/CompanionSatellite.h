@@ -72,6 +72,7 @@ public:
     bool connected();
 
     void keyDown(std::string deviceId, int keyIndex);
+    void keyUp(std::string deviceId, int keyIndex);
 };
 
 std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(std::string line)
@@ -298,11 +299,16 @@ void CompanionSatellite::keyDown(std::string deviceId, int keyIndex)
                                     " PRESSED=1\n");
     }
 }
-// public keyUp(deviceId: string, keyIndex: number): void {
-// 	if (this._connected && this.socket) {
-// 		this.socket.write(`KEY-PRESS DEVICEID=${deviceId} KEY=${keyIndex} PRESSED=0\n`)
-// 	}
-// }
+
+void CompanionSatellite::keyUp(std::string deviceId, int keyIndex)
+{
+    if (this->_connected)
+    {
+        this->transmitBuffer.append("KEY-PRESS DEVICEID=" + deviceId +
+                                    " KEY=" + std::to_string(keyIndex) +
+                                    " PRESSED=0\n");
+    }
+}
 
 void CompanionSatellite::addDevice(std::string deviceId, std::string productName, CompanionSatellite::DeviceRegisterProps props)
 {
