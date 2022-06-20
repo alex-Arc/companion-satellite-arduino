@@ -70,6 +70,8 @@ public:
 
     void _handleReceivedData(char *data);
     bool connected();
+
+    void keyDown(std::string deviceId, int keyIndex);
 };
 
 std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(std::string line)
@@ -199,7 +201,7 @@ void CompanionSatellite::handleCommand(std::string line)
         this->addDevice("1234", "ESP32 test", this->prop);
         break;
     case 8: //'KEY-PRESS':
-        Serial.printf("KEY-PRESS: %s\n", body.data());
+        // Serial.printf("KEY-PRESS: %s\n", body.data());
         // Ignore
         break;
     default:
@@ -225,32 +227,25 @@ void CompanionSatellite::handleState(std::vector<parm> params)
     try
     {
         const int keyIndex = std::stoi(params[1].val);
-    }
-    catch (const std::invalid_argument &ia)
-    {
-        Serial.printf("Bad KEY in KEY-DRAW response: %s\n", ia.what());
-        return;
-    }
+        this->drawQueue.push_back(DeviceDrawProps());
 
-    this->drawQueue.push_back(DeviceDrawProps());
+        this->drawQueue.back().keyIndex = std::stod(params[1].val);
 
-    this->drawQueue.back().keyIndex = std::stod(params[1].val);
-
-    for (auto it = params.begin() + 2; it != params.end(); ++it)
-    {
-        if (this->prop.bitmaps && it->key == "BITMAP")
+        for (auto it = params.begin() + 2; it != params.end(); ++it)
         {
-            this->drawQueue.back().image = it->val;
+            if (this->prop.bitmaps && it->key == "BITMAP")
+            {
+                this->drawQueue.back().image = it->val;
+            }
+            else if (this->prop.color && it->key == "COLOR")
+            {
+                this->drawQueue.back().color = it->val;
+            }
+            else if (this->prop.text && it->key == "TEXT")
+            {
+                this->drawQueue.back().text = B64::decode(it->val);
+            }
         }
-        else if (this->prop.color && it->key == "COLOR")
-        {
-            this->drawQueue.back().color = it->val;
-        }
-        else if (this->prop.text && it->key == "TEXT")
-        {
-            this->drawQueue.back().text = B64::decode(it->val);
-        }
-    }
     }
     catch (const std::invalid_argument &ia)
     {
@@ -294,16 +289,20 @@ void CompanionSatellite::handleBrightness(std::vector<parm> params)
     // this.emit('brightness', { deviceId: params.DEVICEID, percent })
 }
 
-// void CompanionSatellite::keyDown(std::string deviceId, keyIndex: number) {
-// 		if (this->_connected) {
-// 			this->transmitBuffer(`KEY-PRESS DEVICEID=${deviceId} KEY=${keyIndex} PRESSED=1\n`)
-// 		}
+void CompanionSatellite::keyDown(std::string deviceId, int keyIndex)
+{
+    if (this->_connected)
+    {
+        this->transmitBuffer.append("KEY-PRESS DEVICEID=" + deviceId +
+                                    " KEY=" + std::to_string(keyIndex) +
+                                    " PRESSED=1\n");
+    }
+}
+// public keyUp(deviceId: string, keyIndex: number): void {
+// 	if (this._connected && this.socket) {
+// 		this.socket.write(`KEY-PRESS DEVICEID=${deviceId} KEY=${keyIndex} PRESSED=0\n`)
 // 	}
-// 	public keyUp(deviceId: string, keyIndex: number): void {
-// 		if (this._connected && this.socket) {
-// 			this.socket.write(`KEY-PRESS DEVICEID=${deviceId} KEY=${keyIndex} PRESSED=0\n`)
-// 		}
-// 	}
+// }
 
 void CompanionSatellite::addDevice(std::string deviceId, std::string productName, CompanionSatellite::DeviceRegisterProps props)
 {

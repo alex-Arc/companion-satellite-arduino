@@ -1,4 +1,9 @@
 #include <Arduino.h>
+#include <Bounce2.h>
+
+// INSTANTIATE A Bounce OBJECT
+Bounce bounce = Bounce();
+
 #include <CompanionSatellite.h>
 CompanionSatellite compSat;
 
@@ -76,6 +81,9 @@ void setup()
 
   client.connect(IPAddress(192, 168, 0, 10), 16622);
   delay(5);
+
+  bounce.attach(34, INPUT);
+  bounce.interval(5);
 }
 
 void loop()
@@ -94,23 +102,32 @@ void loop()
 
     long int t2 = micros();
     Serial.printf("exec time: %d us\n", t2 - t1);
+  }
 
-    if (!compSat.transmitBuffer.empty())
-    {
-      Serial.printf("TX: >%s<\n", compSat.transmitBuffer.data());
-      client.write(compSat.transmitBuffer.data());
-      compSat.transmitBuffer.clear();
-    }
+  if (!compSat.transmitBuffer.empty())
+  {
+    Serial.printf("TX: >%s<\n", compSat.transmitBuffer.data());
+    client.write(compSat.transmitBuffer.data());
+    compSat.transmitBuffer.clear();
+  }
 
-    if (!compSat.drawQueue.empty())
+  if (!compSat.drawQueue.empty())
+  {
+    while (!compSat.drawQueue.empty())
     {
-      while (!compSat.drawQueue.empty())
-      {
-        Serial.printf("draw id: %s index %d color %s image %s text %s", compSat.drawQueue.front().deviceId.data(), compSat.drawQueue.front().keyIndex, compSat.drawQueue.front().color.data(), compSat.drawQueue.front().image.data(), compSat.drawQueue.front().text.data());
-        compSat.drawQueue.pop_front();
-      }
+      Serial.printf("draw id: %s index %d color %s image %s text %s\n", compSat.drawQueue.front().deviceId.data(), compSat.drawQueue.front().keyIndex, compSat.drawQueue.front().color.data(), compSat.drawQueue.front().image.data(), compSat.drawQueue.front().text.data());
+      compSat.drawQueue.pop_front();
     }
   }
 
-  delay(10);
+  bounce.update();
+  if (bounce.changed())
+  {
+    int deboucedInput = bounce.read();
+
+    if (deboucedInput == LOW)
+    {
+      compSat.keyDown("1234", 0);
+    }
+  }
 }
