@@ -5,7 +5,7 @@
 Bounce bounce = Bounce();
 
 #include <CompanionSatellite.h>
-CompanionSatellite compSat;
+CompanionSatellite compSat = CompanionSatellite("1234", "ESP32-test");
 
 char *buff;
 
@@ -82,13 +82,20 @@ void setup()
   client.connect(IPAddress(192, 168, 0, 10), 16622);
   delay(5);
 
+
   bounce.attach(34, INPUT);
   bounce.interval(5);
 }
 
 void loop()
 {
-  // client.connected()
+  if (!client.connected()) {
+    compSat.maintain(client.connected());
+    delay(500);
+    client.connect(IPAddress(192, 168, 0, 10), 16622);
+  } else {
+    compSat.maintain(client.connected());
+  }
 
   int n = client.available();
   if (n)
@@ -116,7 +123,7 @@ void loop()
   {
     while (!compSat.drawQueue.empty())
     {
-      Serial.printf("draw id: %s index %d color %s image %s text %s\n", compSat.drawQueue.front().deviceId.data(), compSat.drawQueue.front().keyIndex, compSat.drawQueue.front().color.data(), compSat.drawQueue.front().image.data(), compSat.drawQueue.front().text.data());
+      Serial.printf("draw index %d color %s image %s text %s pressed %d\n", compSat.drawQueue.front().keyIndex, compSat.drawQueue.front().color.data(), compSat.drawQueue.front().image.data(), compSat.drawQueue.front().text.data(), compSat.drawQueue.front().pressed);
       compSat.drawQueue.pop_front();
     }
   }

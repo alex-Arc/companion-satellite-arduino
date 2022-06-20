@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <string>
 #include <vector>
+#include <array>
 #include <list>
 #include <algorithm>
 // #include <iterator>
@@ -17,14 +18,19 @@
 class CompanionSatellite
 {
 private:
+    std::string _deviceId;
+    std::string _productName;
+
     struct DeviceDrawProps
     {
-        std::string deviceId;
         int keyIndex;
         std::string image;
         std::string color;
         std::string text;
+        bool pressed;
     };
+
+    std::array<DeviceDrawProps, 1> DeviceDraw;
 
     struct DeviceRegisterProps
     {
@@ -35,7 +41,7 @@ private:
         bool text = true;
     };
 
-    DeviceRegisterProps prop;
+    DeviceRegisterProps _props;
 
     unsigned long _lastReceivedAt;
     std::string_view receiveBuffer;
@@ -60,60 +66,102 @@ private:
         "BEGIN",
         "KEY-PRESS"};
 
-    void addDevice(std::string deviceId, std::string productName, CompanionSatellite::DeviceRegisterProps props);
+    void addDevice();
     void handleAddedDevice(std::vector<parm> params);
     void handleState(std::vector<parm> params);
     void handleBrightness(std::vector<parm> params);
 
+    int _brightness = 100;
+    int _deviceStatus = 0;
+
+    unsigned long _addDeviceTimeout;
+
 public:
-    bool _connected = false;
-    bool _deviceStatus = false;
+    CompanionSatellite(std::string deviceId, std::string productName);
+
+    bool _connectionActive = false;
     std::string transmitBuffer;
     std::list<DeviceDrawProps> drawQueue;
 
     void _handleReceivedData(char *data);
-    bool connected();
 
     void keyDown(std::string deviceId, int keyIndex);
     void keyUp(std::string deviceId, int keyIndex);
+
+    void maintain(bool clientStatus);
 };
+
+CompanionSatellite::CompanionSatellite(std::string deviceId, std::string productName)
+{
+    _deviceId = deviceId;
+    _productName = productName;
+}
+
+void CompanionSatellite::maintain(bool clientStatus)
+{
+    if (clientStatus)
+    {
+        if (_connectionActive)
+        {
+            if (_deviceStatus == 0)
+            {
+                this->addDevice();
+                _addDeviceTimeout = millis();
+            }
+            else if (_deviceStatus == -1)
+            {
+                if (millis() - _addDeviceTimeout > 2000)
+                {
+                    Serial.printf("_addDeviceTimeout\n");
+                    this->addDevice();
+                }
+            }
+        }
+    }
+    else
+    {
+        _connectionActive = false;
+        _deviceStatus = 0;
+    }
+}
 
 std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(std::string_view line)
 {
-    // https://newbedev.com/javascript-split-string-by-space-but-ignore-space-in-quotes-notice-not-to-split-by-the-colon-too
-    // const match = line.match(/\\?.|^$/g);
-
-    // if (size_t quote = line.find_first_of('"'); quote != std::string::npos)
-    // {
-    // TODO: quote parseing
-    /*
-    const fragments = match
-        ? match.reduce(
-                (p, c) => {
-                    if (c === '"') {
-                        p.quote ^= 1
-                    } else if (!p.quote && c === ' ') {
-                        p.a.push('')
-                    } else {
-                        p.a[p.a.length - 1] += c.replace(/\\(.)/, '$1')
-                    }
-                    return p
-                },
-                { a: [''], quote: 0 }
-        ).a
-        : []
-        */
-    // }
-
     std::vector<std::string_view> fragments;
-    size_t offset = 0;
 
-    for (size_t space = line.find_first_of(' ', offset); space != std::string::npos; space = line.find_first_of(' ', offset))
+    bool inQuots = false;
+
+    auto offset = line.begin();
+    // for (size_t space = line.find_first_of(' ', offset); space != std::string::npos; space = line.find_first_of(' ', offset))
+    auto itr = line.begin();
+    for (; itr < line.end(); itr++)
     {
-        fragments.push_back(line.substr(offset, space - offset));
-        offset = space + 1;
+        if (inQuots)
+        {
+            if (*itr == '"')
+            {
+                fragments.push_back(std::string_view(offset, itr - offset + 1));
+                offset = itr + 2;
+                inQuots = false;
+            }
+        }
+        else
+        {
+            if (*itr == '"')
+            {
+                inQuots = true;
+            }
+            else if (*itr == ' ')
+            {
+                fragments.push_back(std::string_view(offset, itr - offset));
+                offset = itr + 1;
+            }
+        }
     }
-    fragments.push_back(line.substr(offset));
+    if (itr - offset > 2)
+    {
+        fragments.push_back(std::string_view(offset, itr - offset));
+    }
 
     std::vector<parm> res;
     for (auto fragment : fragments)
@@ -123,16 +171,21 @@ std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(st
         {
             p.key = fragment.substr(0, equals);
             p.val = fragment.substr(equals + 1);
+            if (p.val.front() == '"')
+            {
+                p.val.remove_prefix(1);
+                p.val.remove_suffix(1);
+            }
             res.push_back(p);
         }
         else
         {
             p.key = fragment.substr(0, equals);
-            p.val = "true";
+            p.val = "1";
             res.push_back(p);
         }
 
-        // Serial.printf("KEY: >%s< VAL: >%s<\n", p.key.data(), p.val.data());
+        // Serial.printf("KEY: >%.*s< VAL: >%.*s<\n", p.key.size(), p.key.data(), p.val.size(), p.val.data());
     }
     return res;
 }
@@ -153,6 +206,10 @@ void CompanionSatellite::_handleReceivedData(char *data)
         this->handleCommand(line); // TODO: remove potential \r
     }
     // this->receiveBuffer.erase(0, offset); //FIX
+    if (this->_deviceStatus == -1)
+    {
+        this->addDevice();
+    }
 }
 
 void CompanionSatellite::handleCommand(std::string_view line)
@@ -201,8 +258,7 @@ void CompanionSatellite::handleCommand(std::string_view line)
     case 7: //'BEGIN':
         Serial.printf("Connected to Companion: %s\n", body.data());
         this->transmitBuffer.clear();
-        this->_connected = true;
-        this->addDevice("1234", "ESP32 test", this->prop);
+        this->_connectionActive = true;
         break;
     case 8: //'KEY-PRESS':
         // Serial.printf("KEY-PRESS: %s\n", body.data());
@@ -217,6 +273,9 @@ void CompanionSatellite::handleCommand(std::string_view line)
 
 void CompanionSatellite::handleState(std::vector<parm> params)
 {
+    // for (auto p : params)
+    //     Serial.printf("KEY: >%.*s< VAL: >%.*s<\n", p.key.size(), p.key.data(), p.val.size(), p.val.data());
+
     if (params[0].key != "DEVICEID")
     {
         Serial.printf("Mising DEVICEID in KEY-DRAW response");
@@ -225,6 +284,12 @@ void CompanionSatellite::handleState(std::vector<parm> params)
     if (params[1].key != "KEY")
     {
         Serial.printf("Mising KEY in KEY-DRAW response");
+        return;
+    }
+
+    if (params[0].val != this->_deviceId)
+    {
+        Serial.printf("Wrong DEVICEID in ADD-DEVICE response\n");
         return;
     }
 
@@ -240,17 +305,21 @@ void CompanionSatellite::handleState(std::vector<parm> params)
 
         for (auto it = params.begin() + 2; it != params.end(); ++it)
         {
-            if (this->prop.bitmaps && it->key == "BITMAP")
+            if (this->_props.bitmaps && it->key == "BITMAP")
             {
                 this->drawQueue.back().image = it->val;
             }
-            else if (this->prop.color && it->key == "COLOR")
+            else if (this->_props.color && it->key == "COLOR")
             {
                 this->drawQueue.back().color = it->val;
             }
-            else if (this->prop.text && it->key == "TEXT")
+            else if (this->_props.text && it->key == "TEXT")
             {
                 this->drawQueue.back().text = B64::decode(it->val);
+            }
+            else if (it->key == "PRESSED")
+            {
+                this->drawQueue.back().pressed = (it->val.front() == '1' || it->val.front() == 't') ? true : false;
             }
         }
     }
@@ -269,9 +338,6 @@ void CompanionSatellite::handleState(std::vector<parm> params)
 
 void CompanionSatellite::handleBrightness(std::vector<parm> params)
 {
-    // for (auto p : params)
-    //     Serial.printf("KEY: >%s< VAL: >%s<\n", p.key.data(), p.val.data());
-
     if (params[0].key != "DEVICEID")
     {
         Serial.printf("Mising DEVICEID in BRIGHTNESS respons\ne");
@@ -282,12 +348,20 @@ void CompanionSatellite::handleBrightness(std::vector<parm> params)
         Serial.printf("Mising VALUE in BRIGHTNESS response\n");
         return;
     }
+
+    if (params[0].val != this->_deviceId)
+    {
+        Serial.printf("Wrong DEVICEID in ADD-DEVICE response\n");
+        return;
+    }
+
     int percent{};
     auto [ptr, ec]{std::from_chars(params[1].val.data(), params[1].val.data() + params[1].val.size(), percent)};
 
     if (ec == std::errc())
     {
-        Serial.printf("BRIGHTNESS: %d\n", percent);
+        // Serial.printf("BRIGHTNESS: %d\n", percent);
+        _brightness = percent;
     }
     else
     {
@@ -300,7 +374,7 @@ void CompanionSatellite::handleBrightness(std::vector<parm> params)
 
 void CompanionSatellite::keyDown(std::string deviceId, int keyIndex)
 {
-    if (this->_connected)
+    if (this->_connectionActive)
     {
         this->transmitBuffer.append("KEY-PRESS DEVICEID=" + deviceId +
                                     " KEY=" + std::to_string(keyIndex) +
@@ -310,7 +384,7 @@ void CompanionSatellite::keyDown(std::string deviceId, int keyIndex)
 
 void CompanionSatellite::keyUp(std::string deviceId, int keyIndex)
 {
-    if (this->_connected)
+    if (this->_connectionActive)
     {
         this->transmitBuffer.append("KEY-PRESS DEVICEID=" + deviceId +
                                     " KEY=" + std::to_string(keyIndex) +
@@ -318,23 +392,27 @@ void CompanionSatellite::keyUp(std::string deviceId, int keyIndex)
     }
 }
 
-void CompanionSatellite::addDevice(std::string deviceId, std::string productName, CompanionSatellite::DeviceRegisterProps props)
+void CompanionSatellite::addDevice()
 {
-    if (this->_connected)
+    if (this->_connectionActive)
     {
         this->transmitBuffer.append(
-            "ADD-DEVICE DEVICEID=" + deviceId +
-            " PRODUCT_NAME=\"" + productName +
-            "\" KEYS_TOTAL=" + std::to_string(props.keysTotal) +
-            " KEYS_PER_ROW=" + std::to_string(props.keysPerRow) +
-            " BITMAPS=" + ((props.bitmaps) ? "1" : "0") +
-            " COLORS=" + ((props.color) ? "1" : "0") +
-            " TEXT=" + ((props.text) ? "1" : "0") + "\n");
+            "ADD-DEVICE DEVICEID=" + this->_deviceId +
+            " PRODUCT_NAME=\"" + this->_productName +
+            "\" KEYS_TOTAL=" + std::to_string(this->_props.keysTotal) +
+            " KEYS_PER_ROW=" + std::to_string(this->_props.keysPerRow) +
+            " BITMAPS=" + ((this->_props.bitmaps) ? "1" : "0") +
+            " COLORS=" + ((this->_props.color) ? "1" : "0") +
+            " TEXT=" + ((this->_props.text) ? "1" : "0") + "\n");
     }
+    this->_deviceStatus = -1;
 }
 
 void CompanionSatellite::handleAddedDevice(std::vector<parm> params)
 {
+    // for (auto p : params)
+    //     Serial.printf("KEY: >%.*s< VAL: >%.*s<\n", p.key.size(), p.key.data(), p.val.size(), p.val.data());
+
     if (params[0].key != "OK" || params[0].key == "ERROR")
     {
         if (params[1].key == "MESSAGE")
@@ -359,14 +437,15 @@ void CompanionSatellite::handleAddedDevice(std::vector<parm> params)
         return;
     }
 
-    _deviceStatus = true;
+    if (params[1].val != this->_deviceId)
+    {
+        Serial.printf("Wrong DEVICEID in ADD-DEVICE response\n");
+        return;
+    }
+
+    _deviceStatus = 1;
 
     // this.emit('newDevice', { deviceId: params.DEVICEID })
-}
-
-bool CompanionSatellite::connected()
-{
-    return false;
 }
 
 #endif
