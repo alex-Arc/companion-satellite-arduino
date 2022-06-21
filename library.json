@@ -1,6 +1,6 @@
 {
     "name": "companion-satellite-arduino",
-    "version": "0.0.1",
+    "version": "0.1.0",
     "description": "A port of companion-satellite to arduino using the V2 API",
     "keywords": "companion",
     "repository":
