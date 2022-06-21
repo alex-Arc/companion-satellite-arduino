@@ -5,7 +5,7 @@
 Bounce bounce = Bounce();
 
 #include <CompanionSatellite.h>
-CompanionSatellite compSat = CompanionSatellite("1234", "ESP32-test");
+CompanionSatellite compSat = CompanionSatellite("1234", "ESP32-test", 2, 2);
 
 char *buff;
 

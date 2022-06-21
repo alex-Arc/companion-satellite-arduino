@@ -77,7 +77,7 @@ private:
     unsigned long _addDeviceTimeout;
 
 public:
-    CompanionSatellite(std::string deviceId, std::string productName);
+    CompanionSatellite(std::string deviceId, std::string productName, int keysTotal, int keysPerRow, bool bitmaps, bool color, bool text);
 
     bool _connectionActive = false;
     std::string transmitBuffer;
@@ -91,10 +91,15 @@ public:
     void maintain(bool clientStatus);
 };
 
-CompanionSatellite::CompanionSatellite(std::string deviceId, std::string productName)
+CompanionSatellite::CompanionSatellite(std::string deviceId, std::string productName, int keysTotal, int keysPerRow, bool bitmaps = false, bool color = false, bool text = false)
 {
-    _deviceId = deviceId;
-    _productName = productName;
+    this->_deviceId = deviceId;
+    this->_productName = productName;
+    this->_props.keysTotal = keysTotal;
+    this->_props.keysPerRow = keysPerRow;
+    this->_props.bitmaps = bitmaps;
+    this->_props.color = color;
+    this->_props.text = text;
 }
 
 void CompanionSatellite::maintain(bool clientStatus)
@@ -132,7 +137,6 @@ std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(st
     bool inQuots = false;
 
     auto offset = line.begin();
-    // for (size_t space = line.find_first_of(' ', offset); space != std::string::npos; space = line.find_first_of(' ', offset))
     auto itr = line.begin();
     for (; itr < line.end(); itr++)
     {
@@ -194,7 +198,6 @@ void CompanionSatellite::_handleReceivedData(char *data)
 {
     this->_lastReceivedAt = millis();
     this->receiveBuffer = std::string_view(data);
-    // Serial.printf("data >%s<\n", this->receiveBuffer.data());
 
     size_t i;
     int offset = 0;
@@ -328,12 +331,6 @@ void CompanionSatellite::handleState(std::vector<parm> params)
         Serial.printf("Bad KEY in KEY-DRAW response\n");
         return;
     }
-
-    // const image = typeof params.BITMAP === 'string' ? Buffer.from(params.BITMAP, 'base64') : undefined
-    // 	const text = typeof params.TEXT === 'string' ? Buffer.from(params.TEXT, 'base64').toString() : undefined
-    // 	const color = typeof params.COLOR === 'string' ? params.COLOR : undefined
-
-    // 	this.emit('draw', { deviceId: params.DEVICEID, keyIndex, image, text, color })
 }
 
 void CompanionSatellite::handleBrightness(std::vector<parm> params)
