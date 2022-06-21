@@ -82,34 +82,35 @@ void setup()
   client.connect(IPAddress(192, 168, 0, 10), 16622);
   delay(5);
 
-
   bounce.attach(34, INPUT);
   bounce.interval(5);
 }
 
 void loop()
 {
-  if (!client.connected()) {
+  if (!client.connected())
+  {
     compSat.maintain(client.connected());
     delay(500);
     client.connect(IPAddress(192, 168, 0, 10), 16622);
-  } else {
-    compSat.maintain(client.connected());
   }
-
-  int n = client.available();
-  if (n)
+  else
   {
-    long int t1 = micros();
 
-    buff = (char *)malloc(n + 1);
-    client.read((uint8_t *)buff, n);
-    // Serial.printf("%.*s \n", n, buff);
+    int n = client.available();
+    if (n)
+    {
+      long int t1 = micros();
 
-    compSat._handleReceivedData(buff);
+      buff = (char *)malloc(n + 1);
+      client.read((uint8_t *)buff, n);
+      // Serial.printf("%.*s \n", n, buff);
 
-    long int t2 = micros();
-    Serial.printf("exec time: %d us\n", t2 - t1);
+      compSat.maintain(client.connected(), buff);
+
+      long int t2 = micros();
+      Serial.printf("exec time: %d us\n", t2 - t1);
+    }
   }
 
   if (!compSat.transmitBuffer.empty())
