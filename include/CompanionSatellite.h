@@ -4,11 +4,7 @@
 #include <Arduino.h>
 #include <string>
 #include <vector>
-#include <array>
-#include <list>
 #include <algorithm>
-// #include <iterator>
-// #include <map>
 
 #include <string_view>
 #include <charconv>
@@ -23,22 +19,19 @@ private:
 
     struct DeviceDrawProps
     {
-        int keyIndex;
-        std::string image;
-        std::string color;
-        std::string text;
-        bool pressed;
+        std::string image = "";
+        std::string color = "";
+        std::string text = "";
+        bool pressed = false;
     };
-
-    std::array<DeviceDrawProps, 1> DeviceDraw;
 
     struct DeviceRegisterProps
     {
-        int keysTotal = 2;
-        int keysPerRow = 2;
-        bool bitmaps = false;
-        bool color = false;
-        bool text = true;
+        int keysTotal;
+        int keysPerRow;
+        bool bitmaps;
+        bool color;
+        bool text;
     };
 
     DeviceRegisterProps _props;
@@ -75,19 +68,25 @@ private:
     int _deviceStatus = 0;
 
     unsigned long _addDeviceTimeout;
+    void _handleReceivedData(char *data);
+    bool _connectionActive = false;
+
+    std::string _keyUpCmd;
+    std::string _keyDownCmd;
 
 public:
 
     CompanionSatellite(std::string deviceId, std::string productName, int keysTotal, int keysPerRow, bool bitmaps=false, bool color=false, bool text=false);
 
-    bool _connectionActive = false;
     std::string transmitBuffer;
-    std::list<DeviceDrawProps> drawQueue;
 
-    void _handleReceivedData(char *data);
+    bool update = false;
 
-    void keyDown(std::string deviceId, int keyIndex);
-    void keyUp(std::string deviceId, int keyIndex);
+    std::vector<DeviceDrawProps> DeviceDraw;
+
+
+    void keyDown(int keyIndex);
+    void keyUp(int keyIndex);
 
     void maintain(bool clientStatus, char *data = nullptr);
 };

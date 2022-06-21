@@ -10,6 +10,11 @@ CompanionSatellite::CompanionSatellite(std::string deviceId, std::string product
     this->_props.bitmaps = bitmaps;
     this->_props.color = color;
     this->_props.text = text;
+
+    this->_keyUpCmd.append("KEY-PRESS DEVICEID=" + _deviceId + " PRESSED=0 KEY=");
+    this->_keyDownCmd.append("KEY-PRESS DEVICEID=" + _deviceId + " PRESSED=1 KEY=");
+
+    DeviceDraw.resize(keysTotal);
 }
 
 void CompanionSatellite::maintain(bool clientStatus, char *data)
@@ -169,8 +174,8 @@ void CompanionSatellite::handleCommand(std::string_view line)
         this->handleAddedDevice(params);
         break;
     case 6: //'REMOVE-DEVICE':
-        Serial.printf("REMOVE-DEVICE: %s\n", body.data());
-
+        // Serial.printf("REMOVE-DEVICE: %s\n", body.data());
+        this->_deviceStatus = 0;
         break;
     case 7: //'BEGIN':
         Serial.printf("Connected to Companion: %s\n", body.data());
@@ -216,29 +221,26 @@ void CompanionSatellite::handleState(std::vector<parm> params)
 
     if (ec == std::errc())
     {
-        this->drawQueue.push_back(DeviceDrawProps());
-
-        this->drawQueue.back().keyIndex = keyIndex;
-
         for (auto it = params.begin() + 2; it != params.end(); ++it)
         {
             if (this->_props.bitmaps && it->key == "BITMAP")
             {
-                this->drawQueue.back().image = it->val;
+                this->DeviceDraw[keyIndex].image = it->val;
             }
             else if (this->_props.color && it->key == "COLOR")
             {
-                this->drawQueue.back().color = it->val;
+                this->DeviceDraw[keyIndex].color = it->val;
             }
             else if (this->_props.text && it->key == "TEXT")
             {
-                this->drawQueue.back().text = B64::decode(it->val);
+                this->DeviceDraw[keyIndex].text = B64::decode(it->val);
             }
             else if (it->key == "PRESSED")
             {
-                this->drawQueue.back().pressed = (it->val.front() == '1' || it->val.front() == 't') ? true : false;
+                this->DeviceDraw[keyIndex].pressed = (it->val.front() == '1' || it->val.front() == 't') ? true : false;
             }
         }
+        this->update = true;
     }
     else
     {
@@ -283,23 +285,19 @@ void CompanionSatellite::handleBrightness(std::vector<parm> params)
     // this.emit('brightness', { deviceId: params.DEVICEID, percent })
 }
 
-void CompanionSatellite::keyDown(std::string deviceId, int keyIndex)
+void CompanionSatellite::keyDown(int keyIndex)
 {
     if (this->_connectionActive)
     {
-        this->transmitBuffer.append("KEY-PRESS DEVICEID=" + deviceId +
-                                    " KEY=" + std::to_string(keyIndex) +
-                                    " PRESSED=1\n");
+        this->transmitBuffer.append(_keyDownCmd + std::to_string(keyIndex) + "\n");
     }
 }
 
-void CompanionSatellite::keyUp(std::string deviceId, int keyIndex)
+void CompanionSatellite::keyUp(int keyIndex)
 {
     if (this->_connectionActive)
     {
-        this->transmitBuffer.append("KEY-PRESS DEVICEID=" + deviceId +
-                                    " KEY=" + std::to_string(keyIndex) +
-                                    " PRESSED=0\n");
+        this->transmitBuffer.append(_keyUpCmd + std::to_string(keyIndex) + "\n");
     }
 }
 

@@ -5,7 +5,7 @@
 Bounce bounce = Bounce();
 
 #include <CompanionSatellite.h>
-CompanionSatellite compSat = CompanionSatellite("1234", "ESP32-test", 2, 2);
+CompanionSatellite compSat = CompanionSatellite("1234", "ESP32-test", 4, 4);
 
 char *buff;
 
@@ -120,13 +120,12 @@ void loop()
     compSat.transmitBuffer.clear();
   }
 
-  if (!compSat.drawQueue.empty())
+  if (compSat.update)
   {
-    while (!compSat.drawQueue.empty())
-    {
-      Serial.printf("draw index %d color %s image %s text %s pressed %d\n", compSat.drawQueue.front().keyIndex, compSat.drawQueue.front().color.data(), compSat.drawQueue.front().image.data(), compSat.drawQueue.front().text.data(), compSat.drawQueue.front().pressed);
-      compSat.drawQueue.pop_front();
+    for (int i = 0; i < compSat.DeviceDraw.size(); i++) {
+      Serial.printf("Draw key %d press%d text %s\n", i, compSat.DeviceDraw[i].pressed, compSat.DeviceDraw[i].text.data());
     }
+    compSat.update =  false;
   }
 
   bounce.update();
@@ -135,8 +134,8 @@ void loop()
     int deboucedInput = bounce.read();
 
     if (deboucedInput == LOW)
-      compSat.keyDown("1234", 0);
+      compSat.keyDown(0);
     else
-      compSat.keyUp("1234", 0);
+      compSat.keyUp(0);
   }
 }
