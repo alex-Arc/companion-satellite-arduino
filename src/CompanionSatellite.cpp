@@ -39,6 +39,7 @@ void CompanionSatellite::maintain(bool clientStatus, char *data)
                 {
                     Serial.printf("_addDeviceTimeout\n");
                     this->addDevice();
+                    _addDeviceTimeout = millis();
                 }
             }
         }
@@ -303,7 +304,7 @@ void CompanionSatellite::keyUp(int keyIndex)
 
 void CompanionSatellite::addDevice()
 {
-    if (this->_connectionActive)
+    if (this->_connectionActive && this->_deviceStatus != 1)
     {
         this->transmitBuffer.append(
             "ADD-DEVICE DEVICEID=" + this->_deviceId +
@@ -317,6 +318,14 @@ void CompanionSatellite::addDevice()
     this->_deviceStatus = -1;
 }
 
+void CompanionSatellite::removeDevice()
+{
+    if (this->_connectionActive)
+    {
+        this->transmitBuffer.append("REMOVE-DEVICE DEVICEID=" + this->_deviceId + "\n");
+    }
+}
+
 void CompanionSatellite::handleAddedDevice(std::vector<parm> params)
 {
     // for (auto p : params)
@@ -324,7 +333,7 @@ void CompanionSatellite::handleAddedDevice(std::vector<parm> params)
 
     if (params[0].key != "OK" || params[0].key == "ERROR")
     {
-        if (params[1].key == "MESSAGE")
+        if (params[2].key == "MESSAGE")
         {
             Serial.printf("Add device failed: %s\n", params[1].val.data());
         }

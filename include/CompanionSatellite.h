@@ -60,6 +60,7 @@ private:
         "KEY-PRESS"};
 
     void addDevice();
+    void removeDevice();
     void handleAddedDevice(std::vector<parm> params);
     void handleState(std::vector<parm> params);
     void handleBrightness(std::vector<parm> params);
