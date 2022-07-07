@@ -51,20 +51,20 @@ void CompanionSatellite::maintain(bool clientStatus, char *data)
 
 std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(std::string_view line)
 {
-    std::vector<std::string_view> fragments;
+    std::vector<std::pair<const char *, const char *>> fragments;
 
     bool inQuots = false;
 
-    auto offset = line.begin();
-    auto itr = line.begin();
-    for (; itr < line.end(); itr++)
+    const char *offset = line.begin();
+    const char *itr = line.begin();
+    const char *line_end = line.end();
+    for (; itr < line_end; itr++)
     {
         if (inQuots)
         {
             if (*itr == '"')
             {
-                fragments.push_back(std::string_view(offset, itr - offset + 1));
-                itr++;
+                fragments.push_back(std::make_pair(offset, itr++));
                 offset = itr + 1;
                 inQuots = false;
             }
@@ -77,24 +77,30 @@ std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(st
             }
             else if (*itr == ' ')
             {
-                fragments.push_back(std::string_view(offset, itr - offset));
-                offset = itr + 1;
+                if (offset != itr) {
+                    if (*offset == ' ')
+                        offset++;
+
+                    fragments.push_back(std::make_pair(offset, itr));
+                    offset = itr + 1;
+                }
             }
         }
     }
     if (itr - offset > 3)
     {
-        fragments.push_back(std::string_view(offset, itr - offset));
+        fragments.push_back(std::make_pair(offset, itr));
     }
 
     std::vector<parm> res;
     for (auto fragment : fragments)
     {
+        // Serial.printf("fragment: >%.*s<\n", fragment.second-fragment.first, fragment.first);
         parm p;
-        if (size_t equals = fragment.find_first_of('='); equals != std::string::npos)
+        if (const char *equals = std::find(fragment.first, fragment.second, '='); equals != fragment.second)
         {
-            p.key = fragment.substr(0, equals);
-            p.val = fragment.substr(equals + 1);
+            p.key = std::string_view(fragment.first, equals - fragment.first); // fragment.substr(0, equals);
+            p.val = std::string_view(equals+1, fragment.second - equals-1);        // fragment.substr(equals + 1);
             if (p.val.front() == '"')
             {
                 p.val.remove_prefix(1);
@@ -107,7 +113,7 @@ std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(st
         }
         else
         {
-            p.key = fragment.substr(0, equals);
+            p.key = std::string_view(fragment.first, equals - fragment.first); // fragment.substr(0, equals);
             p.val = "1";
             res.push_back(p);
         }
@@ -231,10 +237,10 @@ void CompanionSatellite::handleState(std::vector<parm> params)
             {
                 it->val.remove_prefix(1);
                 std::from_chars(it->val.data(), it->val.data() + it->val.size(), this->DeviceDraw[keyIndex].color, 16);
-                Serial.printf("ALL: %d\t RED: %d\t GREEN: %d\t BLUE: %d\n",this->DeviceDraw[keyIndex].color, 
-                this->DeviceDraw[keyIndex].red,
-                this->DeviceDraw[keyIndex].green,
-                this->DeviceDraw[keyIndex].blue);
+                Serial.printf("ALL: %d\t RED: %d\t GREEN: %d\t BLUE: %d\n", this->DeviceDraw[keyIndex].color,
+                              this->DeviceDraw[keyIndex].red,
+                              this->DeviceDraw[keyIndex].green,
+                              this->DeviceDraw[keyIndex].blue);
             }
             else if (this->_props.text && it->key == "TEXT")
             {
