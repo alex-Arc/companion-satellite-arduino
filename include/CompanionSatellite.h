@@ -20,7 +20,16 @@ private:
     struct DeviceDrawProps
     {
         std::string image = "";
-        std::string color = "";
+        union {
+            uint32_t color;
+            struct
+            {
+                uint8_t blue;
+                uint8_t green;
+                uint8_t red;
+                uint8_t nan;
+            };
+        };
         std::string text = "";
         bool pressed = false;
     };
@@ -68,7 +77,7 @@ private:
     int _brightness = 100;
     int _deviceStatus = 0;
 
-    unsigned long _addDeviceTimeout;
+    unsigned long _addDeviceTimeout = millis();
     void _handleReceivedData(char *data);
     bool _connectionActive = false;
 

@@ -26,28 +26,26 @@ void CompanionSatellite::maintain(bool clientStatus, char *data)
             this->_lastReceivedAt = millis();
             this->_handleReceivedData(data);
         }
-        if (_connectionActive)
+        if (this->_connectionActive)
         {
-            if (_deviceStatus == 0)
+            if (this->_deviceStatus == 0)
             {
                 this->addDevice();
-                _addDeviceTimeout = millis();
             }
-            else if (_deviceStatus == -1)
+            else if (this->_deviceStatus == -1)
             {
-                if (millis() - _addDeviceTimeout > 2000)
+                if (millis() - this->_addDeviceTimeout > 10000)
                 {
                     Serial.printf("_addDeviceTimeout\n");
                     this->addDevice();
-                    _addDeviceTimeout = millis();
                 }
             }
         }
     }
     else
     {
-        _connectionActive = false;
-        _deviceStatus = 0;
+        this->_connectionActive = false;
+        this->_deviceStatus = 0;
     }
 }
 
@@ -66,7 +64,8 @@ std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(st
             if (*itr == '"')
             {
                 fragments.push_back(std::string_view(offset, itr - offset + 1));
-                offset = itr + 2;
+                itr++;
+                offset = itr + 1;
                 inQuots = false;
             }
         }
@@ -83,7 +82,7 @@ std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(st
             }
         }
     }
-    if (itr - offset > 2)
+    if (itr - offset > 3)
     {
         fragments.push_back(std::string_view(offset, itr - offset));
     }
@@ -99,6 +98,9 @@ std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(st
             if (p.val.front() == '"')
             {
                 p.val.remove_prefix(1);
+            }
+            while (p.val.back() == '"' || p.val.back() == '\n' || p.val.back() == '\r')
+            {
                 p.val.remove_suffix(1);
             }
             res.push_back(p);
@@ -129,10 +131,6 @@ void CompanionSatellite::_handleReceivedData(char *data)
         this->handleCommand(line); // TODO: remove potential \r
     }
     // this->receiveBuffer.erase(0, offset); //FIX
-    if (this->_deviceStatus == -1)
-    {
-        this->addDevice();
-    }
 }
 
 void CompanionSatellite::handleCommand(std::string_view line)
@@ -175,13 +173,14 @@ void CompanionSatellite::handleCommand(std::string_view line)
         this->handleAddedDevice(params);
         break;
     case 6: //'REMOVE-DEVICE':
-        // Serial.printf("REMOVE-DEVICE: %s\n", body.data());
+        Serial.printf("REMOVE-DEVICE: %s\n", body.data());
         this->_deviceStatus = 0;
         break;
     case 7: //'BEGIN':
         Serial.printf("Connected to Companion: %s\n", body.data());
         this->transmitBuffer.clear();
         this->_connectionActive = true;
+        this->_deviceStatus = 0;
         break;
     case 8: //'KEY-PRESS':
         // Serial.printf("KEY-PRESS: %s\n", body.data());
@@ -230,7 +229,12 @@ void CompanionSatellite::handleState(std::vector<parm> params)
             }
             else if (this->_props.color && it->key == "COLOR")
             {
-                this->DeviceDraw[keyIndex].color = it->val;
+                it->val.remove_prefix(1);
+                std::from_chars(it->val.data(), it->val.data() + it->val.size(), this->DeviceDraw[keyIndex].color, 16);
+                Serial.printf("ALL: %d\t RED: %d\t GREEN: %d\t BLUE: %d\n",this->DeviceDraw[keyIndex].color, 
+                this->DeviceDraw[keyIndex].red,
+                this->DeviceDraw[keyIndex].green,
+                this->DeviceDraw[keyIndex].blue);
             }
             else if (this->_props.text && it->key == "TEXT")
             {
@@ -304,6 +308,7 @@ void CompanionSatellite::keyUp(int keyIndex)
 
 void CompanionSatellite::addDevice()
 {
+    _addDeviceTimeout = millis();
     if (this->_connectionActive && this->_deviceStatus != 1)
     {
         this->transmitBuffer.append(
@@ -320,9 +325,11 @@ void CompanionSatellite::addDevice()
 
 void CompanionSatellite::removeDevice()
 {
+    this->_addDeviceTimeout = millis();
     if (this->_connectionActive)
     {
         this->transmitBuffer.append("REMOVE-DEVICE DEVICEID=" + this->_deviceId + "\n");
+        this->_deviceStatus = 0;
     }
 }
 
@@ -335,7 +342,11 @@ void CompanionSatellite::handleAddedDevice(std::vector<parm> params)
     {
         if (params[2].key == "MESSAGE")
         {
-            Serial.printf("Add device failed: %s\n", params[1].val.data());
+            Serial.printf("Add device failed: %.*s\n", params[2].val.size(), params[2].val.data());
+            if (params[2].val.compare("Device exists elsewhere") == 0)
+            {
+                this->removeDevice();
+            }
         }
         else
         {
@@ -347,6 +358,7 @@ void CompanionSatellite::handleAddedDevice(std::vector<parm> params)
         // 		message: `${params.MESSAGE || 'Unknown Error'}`,
         // 	})
         // }
+        this->_deviceStatus = -1;
         return;
     }
     if (params[1].key != "DEVICEID")
