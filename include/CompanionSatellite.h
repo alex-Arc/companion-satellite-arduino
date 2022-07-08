@@ -22,7 +22,8 @@ private:
     struct DeviceDrawProps
     {
         std::string image = "";
-        union {
+        union
+        {
             uint32_t color;
             struct
             {
@@ -57,7 +58,21 @@ private:
     };
 
     std::vector<parm> parseLineParameters(std::string_view line);
-    void handleCommand(std::string_view line);
+    void handleCommand(std::pair<const char *, const char *> line);
+
+    int findInCmdList(std::pair<const char*, const char *> data);
+
+    const std::vector<std::string>cmd_list = {
+        "ADD-DEVICE",
+        "BEGIN",
+        "BRIGHTNESS",
+        "KEY-PRESS",
+        "KEY-STATE",
+        "KEYS-CLEAR",
+        "PING",
+        "PONG",
+        "REMOVE-DEVICE"
+        };
 
     const std::vector<std::string> commandList = {
         "PING",
@@ -87,8 +102,7 @@ private:
     std::string _keyDownCmd;
 
 public:
-
-    CompanionSatellite(std::string deviceId, std::string productName, int keysTotal, int keysPerRow, bool bitmaps=false, bool color=false, bool text=false);
+    CompanionSatellite(std::string deviceId, std::string productName, int keysTotal, int keysPerRow, bool bitmaps = false, bool color = false, bool text = false);
 
     std::string transmitBuffer;
 
@@ -96,12 +110,10 @@ public:
 
     std::vector<DeviceDrawProps> DeviceDraw;
 
-
     void keyDown(int keyIndex);
     void keyUp(int keyIndex);
 
     void maintain(bool clientStatus, char *data = nullptr);
 };
-
 
 #endif

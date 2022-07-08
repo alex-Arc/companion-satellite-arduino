@@ -49,6 +49,57 @@ void CompanionSatellite::maintain(bool clientStatus, char *data)
     }
 }
 
+/**
+ * Find first match in string list.
+ *
+ * ........
+ *
+ * @param data pair with start and end of data.
+ * @return -1 if no match otherwise index of match.
+ */
+int CompanionSatellite::findInCmdList(std::pair<const char *, const char *> data)
+{
+    int past = 0;
+    for (int i = 0; i < this->cmd_list.size(); i++)
+    {
+        const char *first1 = data.first;
+        const char *last1 = data.second;
+
+        const char *first2 = this->cmd_list[i].data();
+        const char *last2 = this->cmd_list[i].data() + this->cmd_list[i].size() - 1;
+        // Serial.printf(">%.*s< ? >%.*s<\n", data.second-data.first, data.first, this->cmd_list[i].size(), this->cmd_list[i].data());
+
+        while (first1 != last1)
+        {
+            if (*first2 > *first1)
+            {
+                // Serial.printf("%c > %c \n", *first2, *first1);
+                past = -1;
+                break;
+            }
+            else if (*first1 > *first2)
+            {
+                break;
+            }
+            else if (first2 == last2 && *first2 == *first1)
+            {
+                past = 1;
+                break;
+            }
+            ++first1;
+            ++first2;
+        }
+
+        if (past == 1)
+        {
+            // Serial.printf("MATCH %d\n", i);
+            return i;
+        }
+    }
+
+    return -1;
+}
+
 std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(std::string_view line)
 {
     std::vector<std::pair<const char *, const char *>> fragments;
@@ -77,7 +128,8 @@ std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(st
             }
             else if (*itr == ' ')
             {
-                if (offset != itr) {
+                if (offset != itr)
+                {
                     if (*offset == ' ')
                         offset++;
 
@@ -99,8 +151,8 @@ std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(st
         parm p;
         if (const char *equals = std::find(fragment.first, fragment.second, '='); equals != fragment.second)
         {
-            p.key = std::string_view(fragment.first, equals - fragment.first); // fragment.substr(0, equals);
-            p.val = std::string_view(equals+1, fragment.second - equals-1);        // fragment.substr(equals + 1);
+            p.key = std::string_view(fragment.first, equals - fragment.first);  // fragment.substr(0, equals);
+            p.val = std::string_view(equals + 1, fragment.second - equals - 1); // fragment.substr(equals + 1);
             if (p.val.front() == '"')
             {
                 p.val.remove_prefix(1);
@@ -134,66 +186,68 @@ void CompanionSatellite::_handleReceivedData(char *data)
         std::string_view line = this->receiveBuffer.substr(offset, i - offset);
         offset = i + 1;
         // Serial.printf("LINE >%s<\n", line.data());
-        this->handleCommand(line); // TODO: remove potential \r
+        // this->handleCommand(line); // TODO: remove potential \r
+        this->handleCommand(std::make_pair(line.begin(), line.end())); // TODO: remove potential \r
     }
     // this->receiveBuffer.erase(0, offset); //FIX
 }
 
-void CompanionSatellite::handleCommand(std::string_view line)
+void CompanionSatellite::handleCommand(std::pair<const char *, const char *> line)
 {
-    size_t i = line.find_first_of(' ');
-    std::string_view cmd = (i == std::string::npos) ? line : line.substr(0, i);
-    std::string_view body = (i == std::string::npos) ? "" : line.substr(i + 1);
+    std::pair<const char *, const char *> cmd;
 
-    // Serial.printf("CMD: >%s<\tBODY: >%s<\n", cmd.data(), body.data());
+    const char *i = std::find(line.first, line.second, ' ');
+
+    cmd = (i == line.second) ? line : std::make_pair(line.first, i);
+    std::string_view body = (i == line.second) ? "" : std::string_view(i+1, line.second - i-1);
+
+    // Serial.printf("CMD: >%.*s<\tBODY:>%.*s<\n", cmd.second-cmd.first, cmd.first, body.size(), body.data());
 
     std::vector<parm> params = parseLineParameters(body);
 
-    auto cmd_index = std::find(commandList.begin(), commandList.end(), cmd);
-
-    switch (distance(commandList.begin(), cmd_index))
+    switch (this->findInCmdList(cmd))
     {
-    case 0: // PING
-        Serial.printf("PING %s\n", body.data());
-        // this.socket?.write(`PONG ${body}\n`)
-        break;
-    case 1: //'PONG':
-        // console.log('Got pong')
-        Serial.printf("PONG %s\n", body.data());
-        // this._pingUnackedCount = 0
-        break;
-    case 2: //'KEY-STATE':
-        // Serial.printf("KEY-STATE %s\n", body.data());
-        this->handleState(params);
-        break;
-    case 3: //'KEYS-CLEAR':
-        Serial.printf("KEYS-CLEAR %s\n", body.data());
-        // this.handleClear(params)
-        break;
-    case 4: //'BRIGHTNESS':
-        // Serial.printf("BRIGHTNESS %s\n", body.data());
-        this->handleBrightness(params);
-        break;
-    case 5: //'ADD-DEVICE':
+    case 0: //'ADD-DEVICE':
         // Serial.printf("ADD-DEVICE: %s\n", body.data());
         this->handleAddedDevice(params);
         break;
-    case 6: //'REMOVE-DEVICE':
-        Serial.printf("REMOVE-DEVICE: %s\n", body.data());
-        this->_deviceStatus = 0;
-        break;
-    case 7: //'BEGIN':
+    case 1: //'BEGIN':
         Serial.printf("Connected to Companion: %s\n", body.data());
         this->transmitBuffer.clear();
         this->_connectionActive = true;
         this->_deviceStatus = 0;
         break;
-    case 8: //'KEY-PRESS':
+    case 2: //'BRIGHTNESS':
+        // Serial.printf("BRIGHTNESS %s\n", body.data());
+        this->handleBrightness(params);
+        break;
+    case 3: //'KEY-PRESS':
         // Serial.printf("KEY-PRESS: %s\n", body.data());
         // Ignore
         break;
+    case 4: //'KEY-STATE':
+        // Serial.printf("KEY-STATE %s\n", body.data());
+        this->handleState(params);
+        break;
+    case 5: //'KEYS-CLEAR':
+        Serial.printf("KEYS-CLEAR %s\n", body.data());
+        // this.handleClear(params)
+        break;
+    case 6: // PING
+        Serial.printf("PING %s\n", body.data());
+        // this.socket?.write(`PONG ${body}\n`)
+        break;
+    case 7: //'PONG':
+        // console.log('Got pong')
+        Serial.printf("PONG %s\n", body.data());
+        // this._pingUnackedCount = 0
+        break;
+    case 8: //'REMOVE-DEVICE':
+        Serial.printf("REMOVE-DEVICE: %s\n", body.data());
+        this->_deviceStatus = 0;
+        break;
     default:
-        Serial.printf("Received unhandled command: %s %s\n", cmd.data(), body.data());
+        Serial.printf("Received unhandled CMD: >%.*s<\tBODY:>%.*s<\n", cmd.second-cmd.first, cmd.first, body.size(), body.data());
         // console.log(`Received unhandled command: ${cmd} ${body}`)
         break;
     }
