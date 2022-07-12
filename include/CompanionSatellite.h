@@ -51,18 +51,24 @@ private:
     unsigned long _lastReceivedAt;
     std::string_view receiveBuffer;
 
+    const char *true_val = "1";
+    const char *DEVICEID_key = "DEVICEID";
+
+    const std::pair<const char *, const char *> true_val_pair = std::make_pair(true_val, true_val + 1);
+    const std::pair<const char *, const char *> DEVICEID_pair = std::make_pair(DEVICEID_key, DEVICEID_key + 9);
+
     struct parm
     {
-        std::string_view key;
-        std::string_view val;
+        std::pair<const char *, const char *> key;
+        std::pair<const char *, const char *> val;
     };
 
-    std::vector<parm> parseLineParameters(std::string_view line);
+    std::vector<parm> parseLineParameters(std::pair<const char *, const char *> line);
     void handleCommand(std::pair<const char *, const char *> line);
 
-    int findInCmdList(std::pair<const char*, const char *> data);
+    int findInCmdList(std::pair<const char *, const char *> data);
 
-    const std::vector<std::string>cmd_list = {
+    const std::vector<std::string> cmd_list = {
         "ADD-DEVICE",
         "BEGIN",
         "BRIGHTNESS",
@@ -71,19 +77,7 @@ private:
         "KEYS-CLEAR",
         "PING",
         "PONG",
-        "REMOVE-DEVICE"
-        };
-
-    const std::vector<std::string> commandList = {
-        "PING",
-        "PONG",
-        "KEY-STATE",
-        "KEYS-CLEAR",
-        "BRIGHTNESS",
-        "ADD-DEVICE",
-        "REMOVE-DEVICE",
-        "BEGIN",
-        "KEY-PRESS"};
+        "REMOVE-DEVICE"};
 
     void addDevice();
     void removeDevice();

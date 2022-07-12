@@ -89,15 +89,15 @@ int CompanionSatellite::findInCmdList(std::pair<const char *, const char *> data
     return -1;
 }
 
-std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(std::string_view line)
+std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(std::pair<const char *, const char *> line)
 {
     std::vector<std::pair<const char *, const char *>> fragments;
 
     bool inQuots = false;
 
-    const char *offset = line.begin();
-    const char *itr = line.begin();
-    const char *line_end = line.end();
+    const char *offset = line.first;
+    const char *itr = line.first;
+    const char *line_end = line.second;
     for (; itr < line_end; itr++)
     {
         if (inQuots)
@@ -140,26 +140,26 @@ std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(st
         parm p;
         if (const char *equals = std::find(fragment.first, fragment.second, '='); equals != fragment.second)
         {
-            p.key = std::string_view(fragment.first, equals - fragment.first);  // fragment.substr(0, equals);
-            p.val = std::string_view(equals + 1, fragment.second - equals - 1); // fragment.substr(equals + 1);
-            if (p.val.front() == '"')
+            p.key = std::make_pair(fragment.first, equals);      // fragment.substr(0, equals);
+            p.val = std::make_pair(equals + 1, fragment.second); // fragment.substr(equals + 1);
+            if (*p.val.first == '"')
             {
-                p.val.remove_prefix(1);
+                ++p.val.first;
             }
-            while (p.val.back() == '"' || p.val.back() == '\n' || p.val.back() == '\r')
+            while (*p.val.second == '"' || *p.val.second == '\n' || *p.val.second == '\r')
             {
-                p.val.remove_suffix(1);
+                --p.val.second;
             }
             res.push_back(p);
         }
         else
         {
-            p.key = std::string_view(fragment.first, equals - fragment.first); // fragment.substr(0, equals);
-            p.val = "1";
+            p.key = std::make_pair(fragment.first, equals); // fragment.substr(0, equals);
+            p.val = true_val_pair;
             res.push_back(p);
         }
 
-        // Serial.printf("KEY: >%.*s< VAL: >%.*s<\n", p.key.size(), p.key.data(), p.val.size(), p.val.data());
+        // Serial.printf("KEY: >%.*s< VAL: >%.*s<\n", p.key.second - p.key.first, p.key.first, p.val.second - p.val.first, p.val.first);
     }
     return res;
 }
@@ -183,14 +183,14 @@ void CompanionSatellite::_handleReceivedData(char *data)
 
 void CompanionSatellite::handleCommand(std::pair<const char *, const char *> line)
 {
-    std::pair<const char *, const char *> cmd;
+    std::pair<const char *, const char *> cmd, body;
 
     const char *i = std::find(line.first, line.second, ' ');
 
     cmd = (i == line.second) ? line : std::make_pair(line.first, i);
-    std::string_view body = (i == line.second) ? "" : std::string_view(i + 1, line.second - i - 1);
+    body = (i == line.second) ? std::make_pair(nullptr, nullptr) : std::make_pair(i + 1, line.second);
 
-    // Serial.printf("CMD: >%.*s<\tBODY:>%.*s<\n", cmd.second-cmd.first, cmd.first, body.size(), body.data());
+    // Serial.printf("CMD: >%.*s<\tBODY:>%.*s<\n", cmd.second - cmd.first, cmd.first, body.second - body.first, body.first);
 
     std::vector<parm> params = parseLineParameters(body);
 
@@ -201,7 +201,7 @@ void CompanionSatellite::handleCommand(std::pair<const char *, const char *> lin
         this->handleAddedDevice(params);
         break;
     case 1: //'BEGIN':
-        Serial.printf("Connected to Companion: %s\n", body.data());
+        Serial.printf("Connected to Companion: %s\n", body.first);
         this->transmitBuffer.clear();
         this->_connectionActive = true;
         this->_deviceStatus = 0;
@@ -219,24 +219,24 @@ void CompanionSatellite::handleCommand(std::pair<const char *, const char *> lin
         this->handleState(params);
         break;
     case 5: //'KEYS-CLEAR':
-        Serial.printf("KEYS-CLEAR %s\n", body.data());
+        Serial.printf("KEYS-CLEAR %s\n", body.first);
         // this.handleClear(params)
         break;
     case 6: // PING
-        Serial.printf("PING %s\n", body.data());
+        Serial.printf("PING %s\n", body.first);
         // this.socket?.write(`PONG ${body}\n`)
         break;
     case 7: //'PONG':
         // console.log('Got pong')
-        Serial.printf("PONG %s\n", body.data());
+        Serial.printf("PONG %s\n", body.first);
         // this._pingUnackedCount = 0
         break;
     case 8: //'REMOVE-DEVICE':
-        Serial.printf("REMOVE-DEVICE: %s\n", body.data());
+        Serial.printf("REMOVE-DEVICE: %s\n", body.first);
         this->_deviceStatus = 0;
         break;
     default:
-        Serial.printf("Received unhandled CMD: >%.*s<\tBODY:>%.*s<\n", cmd.second - cmd.first, cmd.first, body.size(), body.data());
+        Serial.printf("Received unhandled CMD: >%.*s<\tBODY:>%.*s<\n", cmd.second - cmd.first, cmd.first, body.second - body.first, body.first);
         // console.log(`Received unhandled command: ${cmd} ${body}`)
         break;
     }
@@ -247,18 +247,20 @@ void CompanionSatellite::handleState(std::vector<parm> params)
     // for (auto p : params)
     //     Serial.printf("KEY: >%.*s< VAL: >%.*s<\n", p.key.size(), p.key.data(), p.val.size(), p.val.data());
 
-    if (params[0].key != "DEVICEID")
+    // if (params[0].key != "DEVICEID")
+    if (*params[0].key.first != 'D')
     {
         Serial.printf("Mising DEVICEID in KEY-DRAW response");
         return;
     }
-    if (params[1].key != "KEY")
+    // if (params[1].key != "KEY")
+    if (*params[1].key.first != 'K')
     {
         Serial.printf("Mising KEY in KEY-DRAW response");
         return;
     }
 
-    if (params[0].val != this->_deviceId)
+    if (*params[0].val.first != this->_deviceId[0])
     {
         Serial.printf("Wrong DEVICEID in ADD-DEVICE response\n");
         return;
@@ -266,32 +268,32 @@ void CompanionSatellite::handleState(std::vector<parm> params)
 
     int keyIndex{};
 
-    auto [ptr, ec]{std::from_chars(params[1].val.data(), params[1].val.data() + params[1].val.size(), keyIndex)};
+    auto [ptr, ec]{std::from_chars(params[1].val.first, params[1].val.second, keyIndex)};
 
     if (ec == std::errc())
     {
         for (auto it = params.begin() + 2; it != params.end(); ++it)
         {
-            if (this->_props.bitmaps && it->key == "BITMAP")
+            if (this->_props.bitmaps && *it->key.first == 'B')
             {
-                this->DeviceDraw[keyIndex].image = it->val;
+                // this->DeviceDraw[keyIndex].image = it->val;
             }
-            else if (this->_props.color && it->key == "COLOR")
+            else if (this->_props.color && *it->key.first == 'C')
             {
-                it->val.remove_prefix(1);
-                std::from_chars(it->val.data(), it->val.data() + it->val.size(), this->DeviceDraw[keyIndex].color, 16);
+                ++it->val.first;
+                std::from_chars(it->val.first, it->val.second, this->DeviceDraw[keyIndex].color, 16);
                 Serial.printf("ALL: %d\t RED: %d\t GREEN: %d\t BLUE: %d\n", this->DeviceDraw[keyIndex].color,
                               this->DeviceDraw[keyIndex].red,
                               this->DeviceDraw[keyIndex].green,
                               this->DeviceDraw[keyIndex].blue);
             }
-            else if (this->_props.text && it->key == "TEXT")
+            else if (this->_props.text && *it->key.first == 'T')
             {
-                this->DeviceDraw[keyIndex].text = B64::decode(it->val);
+                // this->DeviceDraw[keyIndex].text = B64::decode(it->val);
             }
-            else if (it->key == "PRESSED")
+            else if (*it->key.first == 'P')
             {
-                this->DeviceDraw[keyIndex].pressed = (it->val.front() == '1' || it->val.front() == 't') ? true : false;
+                this->DeviceDraw[keyIndex].pressed = (*it->val.first == '1' || *it->val.first == 't') ? true : false;
             }
         }
         this->update = true;
@@ -305,25 +307,26 @@ void CompanionSatellite::handleState(std::vector<parm> params)
 
 void CompanionSatellite::handleBrightness(std::vector<parm> params)
 {
-    if (params[0].key != "DEVICEID")
+    // if (params[0].key != "DEVICEID")
+    if (*params[0].key.first != 'D')
     {
-        Serial.printf("Mising DEVICEID in BRIGHTNESS respons\ne");
+        Serial.printf("Mising DEVICEID in BRIGHTNESS respons\n");
         return;
     }
-    if (params[1].key != "VALUE")
+    if (*params[1].key.first != 'V')
     {
         Serial.printf("Mising VALUE in BRIGHTNESS response\n");
         return;
     }
 
-    if (params[0].val != this->_deviceId)
+    if (*params[0].val.first != this->_deviceId[0])
     {
         Serial.printf("Wrong DEVICEID in ADD-DEVICE response\n");
         return;
     }
 
     int percent{};
-    auto [ptr, ec]{std::from_chars(params[1].val.data(), params[1].val.data() + params[1].val.size(), percent)};
+    auto [ptr, ec]{std::from_chars(params[1].val.first, params[1].val.second, percent)};
 
     if (ec == std::errc())
     {
@@ -387,15 +390,17 @@ void CompanionSatellite::handleAddedDevice(std::vector<parm> params)
     // for (auto p : params)
     //     Serial.printf("KEY: >%.*s< VAL: >%.*s<\n", p.key.size(), p.key.data(), p.val.size(), p.val.data());
 
-    if (params[0].key != "OK" || params[0].key == "ERROR")
+    // if (*params[0].key.first != 'O' || params[0].key.first == "ERROR")
+    if (*params[0].key.first != 'O' || *params[0].key.first == 'E')
     {
-        if (params[2].key == "MESSAGE")
+        // if (params[2].key == "MESSAGE")
+        if (*params[2].key.first == 'M')
         {
-            Serial.printf("Add device failed: %.*s\n", params[2].val.size(), params[2].val.data());
-            if (params[2].val.compare("Device exists elsewhere") == 0)
-            {
-                this->removeDevice();
-            }
+            Serial.printf("Add device failed: %.*s\n", params[2].val.second - params[2].val.first, params[2].val.first);
+            // if (params[2].val.compare("Device exists elsewhere") == 0)
+            // {
+            //     this->removeDevice();
+            // }
         }
         else
         {
@@ -410,13 +415,14 @@ void CompanionSatellite::handleAddedDevice(std::vector<parm> params)
         this->_deviceStatus = -1;
         return;
     }
-    if (params[1].key != "DEVICEID")
+    // if (params[1].key != "DEVICEID")
+    if (*params[1].key.first != 'D')
     {
         Serial.printf("Mising DEVICEID in ADD-DEVICE response");
         return;
     }
 
-    if (params[1].val != this->_deviceId)
+    if (*params[1].val.first != this->_deviceId[0])
     {
         Serial.printf("Wrong DEVICEID in ADD-DEVICE response\n");
         return;
