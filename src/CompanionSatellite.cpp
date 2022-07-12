@@ -17,14 +17,14 @@ CompanionSatellite::CompanionSatellite(std::string deviceId, std::string product
     DeviceDraw.resize(keysTotal);
 }
 
-void CompanionSatellite::maintain(bool clientStatus, char *data)
+void CompanionSatellite::maintain(bool clientStatus,const char *data, size_t len)
 {
     if (clientStatus)
     {
         if (data != nullptr)
         {
             this->_lastReceivedAt = millis();
-            this->_handleReceivedData(data);
+            this->_handleReceivedData(data, len);
         }
         if (this->_connectionActive)
         {
@@ -164,19 +164,15 @@ std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(st
     return res;
 }
 
-void CompanionSatellite::_handleReceivedData(char *data)
+void CompanionSatellite::_handleReceivedData(const char *data, size_t len)
 {
-    this->receiveBuffer = std::string_view(data);
-
-    size_t i;
-    int offset = 0;
-    while ((i = this->receiveBuffer.find_first_of('\n', offset)) != std::string::npos)
+    const char *i;
+    while ((i = std::find(data, data + len, '\n')) != data + len)
     {
-        std::string_view line = this->receiveBuffer.substr(offset, i - offset);
-        offset = i + 1;
+        this->handleCommand(std::make_pair(data, i)); // TODO: remove potential \r
+        data = ++i;
         // Serial.printf("LINE >%s<\n", line.data());
         // this->handleCommand(line); // TODO: remove potential \r
-        this->handleCommand(std::make_pair(line.begin(), line.end())); // TODO: remove potential \r
     }
     // this->receiveBuffer.erase(0, offset); //FIX
 }

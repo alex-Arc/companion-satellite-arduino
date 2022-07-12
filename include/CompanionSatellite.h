@@ -8,7 +8,6 @@
 
 #include <utility>
 
-#include <string_view>
 #include <charconv>
 
 #include <B64.h>
@@ -49,7 +48,6 @@ private:
     DeviceRegisterProps _props;
 
     unsigned long _lastReceivedAt;
-    std::string_view receiveBuffer;
 
     const char *true_val = "1";
     const char *DEVICEID_key = "DEVICEID";
@@ -89,7 +87,7 @@ private:
     int _deviceStatus = 0;
 
     unsigned long _addDeviceTimeout = millis();
-    void _handleReceivedData(char *data);
+    void _handleReceivedData(const char *data, size_t len);
     bool _connectionActive = false;
 
     std::string _keyUpCmd;
@@ -107,7 +105,7 @@ public:
     void keyDown(int keyIndex);
     void keyUp(int keyIndex);
 
-    void maintain(bool clientStatus, char *data = nullptr);
+    void maintain(bool clientStatus, const char *data = nullptr, size_t len = 0);
 };
 
 #endif
