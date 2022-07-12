@@ -262,11 +262,13 @@ void CompanionSatellite::handleState(std::vector<parm> params)
         return;
     }
 
-    int keyIndex{};
+    int keyIndex = -1;
 
-    auto [ptr, ec]{std::from_chars(params[1].val.first, params[1].val.second, keyIndex)};
+    // auto [ptr, ec]{std::from_chars(params[1].val.first, params[1].val.second, keyIndex)};
 
-    if (ec == std::errc())
+    keyIndex = std::strtod(params[1].val.first, nullptr);
+
+    if (keyIndex >= 0)
     {
         for (auto it = params.begin() + 2; it != params.end(); ++it)
         {
@@ -277,7 +279,8 @@ void CompanionSatellite::handleState(std::vector<parm> params)
             else if (this->_props.color && *it->key.first == 'C')
             {
                 ++it->val.first;
-                std::from_chars(it->val.first, it->val.second, this->DeviceDraw[keyIndex].color, 16);
+                // std::from_chars(it->val.first, it->val.second, this->DeviceDraw[keyIndex].color, 16); c++17
+                this->DeviceDraw[keyIndex].color = std::strtol(it->val.first, nullptr, 16);
                 Serial.printf("ALL: %d\t RED: %d\t GREEN: %d\t BLUE: %d\n", this->DeviceDraw[keyIndex].color,
                               this->DeviceDraw[keyIndex].red,
                               this->DeviceDraw[keyIndex].green,
@@ -321,10 +324,12 @@ void CompanionSatellite::handleBrightness(std::vector<parm> params)
         return;
     }
 
-    int percent{};
-    auto [ptr, ec]{std::from_chars(params[1].val.first, params[1].val.second, percent)};
+    int percent = -1;
+    // auto [ptr, ec]{std::from_chars(params[1].val.first, params[1].val.second, percent)};
 
-    if (ec == std::errc())
+    percent = std::strtod(params[1].val.first, nullptr);
+
+    if (percent >= 0)
     {
         // Serial.printf("BRIGHTNESS: %d\n", percent);
         _brightness = percent;
