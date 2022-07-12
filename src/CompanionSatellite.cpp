@@ -51,21 +51,18 @@ void CompanionSatellite::maintain(bool clientStatus, char *data)
 
 /**
  * Find first match in string list.
- *
- * ........
- *
  * @param data pair with start and end of data.
- * @return -1 if no match otherwise index of match.
+ * @return -1 if no match, otherwise index of match.
  */
 int CompanionSatellite::findInCmdList(std::pair<const char *, const char *> data)
 {
-    int past = 0;
+    const char *first1 = data.first;
+    const char *last1 = data.second;
+
     for (int i = 0; i < this->cmd_list.size(); i++)
     {
-        const char *first1 = data.first;
-        const char *last1 = data.second;
 
-        const char *first2 = this->cmd_list[i].data();
+        const char *first2 = this->cmd_list[i].data() + (first1 - data.first);
         const char *last2 = this->cmd_list[i].data() + this->cmd_list[i].size() - 1;
         // Serial.printf(">%.*s< ? >%.*s<\n", data.second-data.first, data.first, this->cmd_list[i].size(), this->cmd_list[i].data());
 
@@ -74,8 +71,7 @@ int CompanionSatellite::findInCmdList(std::pair<const char *, const char *> data
             if (*first2 > *first1)
             {
                 // Serial.printf("%c > %c \n", *first2, *first1);
-                past = -1;
-                break;
+                return -1;
             }
             else if (*first1 > *first2)
             {
@@ -83,17 +79,10 @@ int CompanionSatellite::findInCmdList(std::pair<const char *, const char *> data
             }
             else if (first2 == last2 && *first2 == *first1)
             {
-                past = 1;
-                break;
+                return i;
             }
             ++first1;
             ++first2;
-        }
-
-        if (past == 1)
-        {
-            // Serial.printf("MATCH %d\n", i);
-            return i;
         }
     }
 
@@ -199,7 +188,7 @@ void CompanionSatellite::handleCommand(std::pair<const char *, const char *> lin
     const char *i = std::find(line.first, line.second, ' ');
 
     cmd = (i == line.second) ? line : std::make_pair(line.first, i);
-    std::string_view body = (i == line.second) ? "" : std::string_view(i+1, line.second - i-1);
+    std::string_view body = (i == line.second) ? "" : std::string_view(i + 1, line.second - i - 1);
 
     // Serial.printf("CMD: >%.*s<\tBODY:>%.*s<\n", cmd.second-cmd.first, cmd.first, body.size(), body.data());
 
@@ -247,7 +236,7 @@ void CompanionSatellite::handleCommand(std::pair<const char *, const char *> lin
         this->_deviceStatus = 0;
         break;
     default:
-        Serial.printf("Received unhandled CMD: >%.*s<\tBODY:>%.*s<\n", cmd.second-cmd.first, cmd.first, body.size(), body.data());
+        Serial.printf("Received unhandled CMD: >%.*s<\tBODY:>%.*s<\n", cmd.second - cmd.first, cmd.first, body.size(), body.data());
         // console.log(`Received unhandled command: ${cmd} ${body}`)
         break;
     }
