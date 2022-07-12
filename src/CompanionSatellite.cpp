@@ -285,7 +285,7 @@ void CompanionSatellite::handleState(std::vector<parm> params)
             }
             else if (this->_props.text && *it->key.first == 'T')
             {
-                // this->DeviceDraw[keyIndex].text = B64::decode(it->val);
+                this->DeviceDraw[keyIndex].text = B64::decode(it->val.first, it->val.second-it->val.first);
             }
             else if (*it->key.first == 'P')
             {
