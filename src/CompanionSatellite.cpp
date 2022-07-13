@@ -120,7 +120,7 @@ std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(ch
     std::vector<parm> res;
     for (auto fragment : fragments)
     {
-        Serial.printf("fragment: >%s<\n", fragment);
+        // Serial.printf("fragment: >%s<\n", fragment);
         parm p;
         char *equals = strchr(fragment, '=');
         if (equals != nullptr)
@@ -128,9 +128,10 @@ std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(ch
             *equals = 0;
             p.key = fragment; // fragment.substr(0, equals);
             p.val = ++equals; // fragment.substr(equals + 1);
-            if (*p.val == '"') {
+            if (*p.val == '"')
+            {
                 p.val++;
-            } 
+            }
             res.push_back(p);
         }
         else
@@ -140,7 +141,7 @@ std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(ch
             res.push_back(p);
         }
 
-        Serial.printf("KEY: >%s< VAL: >%s<\n", p.key, p.val);
+        // Serial.printf("KEY: >%s< VAL: >%s<\n", p.key, p.val);
     }
     return res;
 }
@@ -295,22 +296,22 @@ void CompanionSatellite::handleState(std::vector<parm> params)
 void CompanionSatellite::handleBrightness(std::vector<parm> params)
 {
     // if (params[0].key != "DEVICEID")
-    if (*params[0].key != 'D')
-    {
-        Serial.printf("Mising DEVICEID in BRIGHTNESS respons\n");
-        return;
-    }
-    if (*params[1].key != 'V')
-    {
-        Serial.printf("Mising VALUE in BRIGHTNESS response\n");
-        return;
-    }
+    // if (*params[0].key != 'D')
+    // {
+    //     Serial.printf("Mising DEVICEID in BRIGHTNESS respons\n");
+    //     return;
+    // }
+    // if (*params[1].key != 'V')
+    // {
+    //     Serial.printf("Mising VALUE in BRIGHTNESS response\n");
+    //     return;
+    // }
 
-    if (*params[0].val != this->_deviceId[0])
-    {
-        Serial.printf("Wrong DEVICEID in ADD-DEVICE response\n");
-        return;
-    }
+    // if (*params[0].val != this->_deviceId[0])
+    // {
+    //     Serial.printf("Wrong DEVICEID in ADD-DEVICE response\n");
+    //     return;
+    // }
 
     int percent = -1;
     // auto [ptr, ec]{std::from_chars(params[1].val.first, params[1].val.second, percent)};
@@ -385,14 +386,9 @@ void CompanionSatellite::removeDevice()
 
 void CompanionSatellite::handleAddedDevice(std::vector<parm> params)
 {
-    // for (auto p : params)
-    //     Serial.printf("KEY: >%s< VAL: >%s<\n", p.key.size(), p.key.data(), p.val.size(), p.val.data());
-
-    // if (*params[0].key.first != 'O' || params[0].key.first == "ERROR")
-    if (*params[0].key != 'O' || *params[0].key == 'E')
+    if (strcmp(params[0].key, "OK") != 0 || strcmp(params[0].key, "ERROR") == 0)
     {
-        // if (params[2].key == "MESSAGE")
-        if (*params[2].key == 'M')
+        if (strcmp(params[2].key, "MESSAGE") == 0)
         {
             Serial.printf("Add device failed: %s\n", params[2].val - params[2].val, params[2].val);
             // if (params[2].val.compare("Device exists elsewhere") == 0)
@@ -413,14 +409,13 @@ void CompanionSatellite::handleAddedDevice(std::vector<parm> params)
         this->_deviceStatus = -1;
         return;
     }
-    // if (params[1].key != "DEVICEID")
-    if (*params[1].key != 'D')
+    if (strcmp(params[1].key, "DEVICEID") == 0)
     {
         Serial.printf("Mising DEVICEID in ADD-DEVICE response");
         return;
     }
 
-    if (*params[1].val != this->_deviceId[0])
+    if (strcmp(params[1].val, this->_deviceId.data()) != 0)
     {
         Serial.printf("Wrong DEVICEID in ADD-DEVICE response\n");
         return;
