@@ -50,21 +50,18 @@ private:
     const char *true_val = "1";
     const char *DEVICEID_key = "DEVICEID";
 
-    const std::pair<const char *, const char *> true_val_pair = std::make_pair(true_val, true_val + 1);
-    const std::pair<const char *, const char *> DEVICEID_pair = std::make_pair(DEVICEID_key, DEVICEID_key + 9);
-
     struct parm
     {
-        std::pair<const char *, const char *> key;
-        std::pair<const char *, const char *> val;
+        const char *key;
+        const char *val;
     };
 
-    std::vector<parm> parseLineParameters(std::pair<const char *, const char *> line);
-    void handleCommand(std::pair<const char *, const char *> line);
+    std::vector<parm> parseLineParameters(char *line);
+    void handleCommand(char *line);
 
-    int findInCmdList(std::pair<const char *, const char *> data);
+    int findInCmdList(char * data);
 
-    const std::vector<std::string> cmd_list = {
+    const std::vector<const char*> cmd_list = {
         "ADD-DEVICE",
         "BEGIN",
         "BRIGHTNESS",
@@ -85,7 +82,7 @@ private:
     int _deviceStatus = 0;
 
     unsigned long _addDeviceTimeout = millis();
-    void _handleReceivedData(const char *data, size_t len);
+    void _handleReceivedData(char *data, size_t len);
     bool _connectionActive = false;
 
     std::string _keyUpCmd;
@@ -103,7 +100,7 @@ public:
     void keyDown(int keyIndex);
     void keyUp(int keyIndex);
 
-    void maintain(bool clientStatus, const char *data = nullptr, size_t len = 0);
+    void maintain(bool clientStatus, char *data = nullptr, size_t len = 0);
 };
 
 #endif
