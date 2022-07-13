@@ -6,8 +6,7 @@
 #include <vector>
 #include <algorithm>
 
-#include <string_view>
-#include <charconv>
+#include <utility>
 
 #include <B64.h>
 
@@ -20,7 +19,8 @@ private:
     struct DeviceDrawProps
     {
         std::string image = "";
-        union {
+        union
+        {
             uint32_t color;
             struct
             {
@@ -36,8 +36,8 @@ private:
 
     struct DeviceRegisterProps
     {
-        int keysTotal;
-        int keysPerRow;
+        uint8_t keysTotal;
+        uint8_t keysPerRow;
         bool bitmaps;
         bool color;
         bool text;
@@ -46,27 +46,34 @@ private:
     DeviceRegisterProps _props;
 
     unsigned long _lastReceivedAt;
-    std::string_view receiveBuffer;
+
+    const char *true_val = "1";
+    const char *DEVICEID_key = "DEVICEID";
+
+    const std::pair<const char *, const char *> true_val_pair = std::make_pair(true_val, true_val + 1);
+    const std::pair<const char *, const char *> DEVICEID_pair = std::make_pair(DEVICEID_key, DEVICEID_key + 9);
 
     struct parm
     {
-        std::string_view key;
-        std::string_view val;
+        std::pair<const char *, const char *> key;
+        std::pair<const char *, const char *> val;
     };
 
-    std::vector<parm> parseLineParameters(std::string_view line);
-    void handleCommand(std::string_view line);
+    std::vector<parm> parseLineParameters(std::pair<const char *, const char *> line);
+    void handleCommand(std::pair<const char *, const char *> line);
 
-    const std::vector<std::string> commandList = {
-        "PING",
-        "PONG",
+    int findInCmdList(std::pair<const char *, const char *> data);
+
+    const std::vector<std::string> cmd_list = {
+        "ADD-DEVICE",
+        "BEGIN",
+        "BRIGHTNESS",
+        "KEY-PRESS",
         "KEY-STATE",
         "KEYS-CLEAR",
-        "BRIGHTNESS",
-        "ADD-DEVICE",
-        "REMOVE-DEVICE",
-        "BEGIN",
-        "KEY-PRESS"};
+        "PING",
+        "PONG",
+        "REMOVE-DEVICE"};
 
     void addDevice();
     void removeDevice();
@@ -78,15 +85,14 @@ private:
     int _deviceStatus = 0;
 
     unsigned long _addDeviceTimeout = millis();
-    void _handleReceivedData(char *data);
+    void _handleReceivedData(const char *data, size_t len);
     bool _connectionActive = false;
 
     std::string _keyUpCmd;
     std::string _keyDownCmd;
 
 public:
-
-    CompanionSatellite(std::string deviceId, std::string productName, int keysTotal, int keysPerRow, bool bitmaps=false, bool color=false, bool text=false);
+    CompanionSatellite(std::string deviceId, std::string productName, int keysTotal, int keysPerRow, bool bitmaps = false, bool color = false, bool text = false);
 
     std::string transmitBuffer;
 
@@ -94,12 +100,10 @@ public:
 
     std::vector<DeviceDrawProps> DeviceDraw;
 
-
     void keyDown(int keyIndex);
     void keyUp(int keyIndex);
 
-    void maintain(bool clientStatus, char *data = nullptr);
+    void maintain(bool clientStatus, const char *data = nullptr, size_t len = 0);
 };
-
 
 #endif
