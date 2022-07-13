@@ -17,7 +17,7 @@ CompanionSatellite::CompanionSatellite(std::string deviceId, std::string product
     DeviceDraw.resize(keysTotal);
 }
 
-void CompanionSatellite::maintain(bool clientStatus,const char *data, size_t len)
+void CompanionSatellite::maintain(bool clientStatus, const char *data, size_t len)
 {
     if (clientStatus)
     {
@@ -59,7 +59,7 @@ int CompanionSatellite::findInCmdList(std::pair<const char *, const char *> data
     const char *first1 = data.first;
     const char *last1 = data.second;
 
-    for (int i = 0; i < this->cmd_list.size(); i++)
+    for (uint8_t i = 0; i < this->cmd_list.size(); i++)
     {
 
         const char *first2 = this->cmd_list[i].data() + (first1 - data.first);
@@ -138,7 +138,8 @@ std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(st
     {
         // Serial.printf("fragment: >%.*s<\n", fragment.second-fragment.first, fragment.first);
         parm p;
-        if (const char *equals = std::find(fragment.first, fragment.second, '='); equals != fragment.second)
+        const char *equals = std::find(fragment.first, fragment.second, '=');
+        if (equals != fragment.second)
         {
             p.key = std::make_pair(fragment.first, equals);      // fragment.substr(0, equals);
             p.val = std::make_pair(equals + 1, fragment.second); // fragment.substr(equals + 1);
@@ -288,7 +289,7 @@ void CompanionSatellite::handleState(std::vector<parm> params)
             }
             else if (this->_props.text && *it->key.first == 'T')
             {
-                this->DeviceDraw[keyIndex].text = B64::decode(it->val.first, it->val.second-it->val.first);
+                this->DeviceDraw[keyIndex].text = B64::decode(it->val.first, it->val.second - it->val.first);
             }
             else if (*it->key.first == 'P')
             {
@@ -347,7 +348,9 @@ void CompanionSatellite::keyDown(int keyIndex)
 {
     if (this->_connectionActive)
     {
-        this->transmitBuffer.append(_keyDownCmd + std::to_string(keyIndex) + "\n");
+        char ki[4];
+        snprintf(ki, 4, "%d", keyIndex);
+        this->transmitBuffer.append(_keyDownCmd + std::string(ki) + "\n");
     }
 }
 
@@ -355,7 +358,9 @@ void CompanionSatellite::keyUp(int keyIndex)
 {
     if (this->_connectionActive)
     {
-        this->transmitBuffer.append(_keyUpCmd + std::to_string(keyIndex) + "\n");
+        char ki[4];
+        snprintf(ki, 4, "%d", keyIndex);
+        this->transmitBuffer.append(_keyUpCmd + std::string(ki) + "\n");
     }
 }
 
@@ -364,11 +369,16 @@ void CompanionSatellite::addDevice()
     _addDeviceTimeout = millis();
     if (this->_connectionActive && this->_deviceStatus != 1)
     {
+        char kt[4];
+        char kpr[4];
+        snprintf(kt, 4, "%d", this->_props.keysTotal);
+        snprintf(kpr, 4, "%d", this->_props.keysPerRow);
+
         this->transmitBuffer.append(
             "ADD-DEVICE DEVICEID=" + this->_deviceId +
             " PRODUCT_NAME=\"" + this->_productName +
-            "\" KEYS_TOTAL=" + std::to_string(this->_props.keysTotal) +
-            " KEYS_PER_ROW=" + std::to_string(this->_props.keysPerRow) +
+            "\" KEYS_TOTAL=" + std::string(kt) +
+            " KEYS_PER_ROW=" + std::string(kpr) +
             " BITMAPS=" + ((this->_props.bitmaps) ? "1" : "0") +
             " COLORS=" + ((this->_props.color) ? "1" : "0") +
             " TEXT=" + ((this->_props.text) ? "1" : "0") + "\n");

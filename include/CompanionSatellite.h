@@ -8,8 +8,6 @@
 
 #include <utility>
 
-#include <charconv>
-
 #include <B64.h>
 
 class CompanionSatellite
@@ -38,8 +36,8 @@ private:
 
     struct DeviceRegisterProps
     {
-        int keysTotal;
-        int keysPerRow;
+        uint8_t keysTotal;
+        uint8_t keysPerRow;
         bool bitmaps;
         bool color;
         bool text;
