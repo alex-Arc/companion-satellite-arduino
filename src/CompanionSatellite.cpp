@@ -409,7 +409,7 @@ void CompanionSatellite::handleAddedDevice(std::vector<parm> params)
         this->_deviceStatus = -1;
         return;
     }
-    if (strcmp(params[1].key, "DEVICEID") == 0)
+    if (strcmp(params[1].key, "DEVICEID") != 0)
     {
         Serial.printf("Mising DEVICEID in ADD-DEVICE response");
         return;
