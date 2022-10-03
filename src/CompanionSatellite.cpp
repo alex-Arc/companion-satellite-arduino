@@ -36,7 +36,7 @@ void CompanionSatellite::maintain(bool clientStatus, char *data, size_t len)
             {
                 if (millis() - this->_addDeviceTimeout > 10000)
                 {
-                    Serial.printf("_addDeviceTimeout\n");
+                    //Serial.printf("_addDeviceTimeout\n");
                     this->addDevice();
                 }
             }
@@ -60,7 +60,7 @@ int CompanionSatellite::findInCmdList(char *data)
     {
 
         const char *first2 = this->cmd_list[i];
-        // Serial.printf(">%s< ? >%s<\n", data, this->cmd_list[i]);
+        // //Serial.printf(">%s< ? >%s<\n", data, this->cmd_list[i]);
         if (strcmp(data, first2) == 0) // TODO: this can be optimized
         {
             return i;
@@ -120,7 +120,7 @@ std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(ch
     std::vector<parm> res;
     for (auto fragment : fragments)
     {
-        // Serial.printf("fragment: >%s<\n", fragment);
+        // //Serial.printf("fragment: >%s<\n", fragment);
         parm p;
         char *equals = strchr(fragment, '=');
         if (equals != nullptr)
@@ -141,7 +141,7 @@ std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(ch
             res.push_back(p);
         }
 
-        // Serial.printf("KEY: >%s< VAL: >%s<\n", p.key, p.val);
+        // //Serial.printf("KEY: >%s< VAL: >%s<\n", p.key, p.val);
     }
     return res;
 }
@@ -154,7 +154,7 @@ void CompanionSatellite::_handleReceivedData(char *data, size_t len)
         *i = 0;
         this->handleCommand(data); // TODO: remove potential \r
         data = ++i;
-        // Serial.printf("LINE >%s<\n", line.data());
+        // //Serial.printf("LINE >%s<\n", line.data());
         // this->handleCommand(line); // TODO: remove potential \r
     }
     // this->receiveBuffer.erase(0, offset); //FIX
@@ -175,53 +175,53 @@ void CompanionSatellite::handleCommand(char *line)
 
     body = (i == nullptr) ? nullptr : ++i;
 
-    Serial.printf("CMD: >%s<\tBODY:>%s<\n", cmd, body);
+    //Serial.printf("CMD: >%s<\tBODY:>%s<\n", cmd, body);
 
     std::vector<parm> params = parseLineParameters(body);
 
     switch (this->findInCmdList(cmd))
     {
     case 0: //'ADD-DEVICE':
-        // Serial.printf("ADD-DEVICE: %s\n", body.data());
+        // //Serial.printf("ADD-DEVICE: %s\n", body.data());
         this->handleAddedDevice(params);
         break;
     case 1: //'BEGIN':
-        Serial.printf("Connected to Companion: %s\n", body);
+        //Serial.printf("Connected to Companion: %s\n", body);
         this->transmitBuffer.clear();
         this->_connectionActive = true;
         this->_deviceStatus = 0;
         break;
     case 2: //'BRIGHTNESS':
-        // Serial.printf("BRIGHTNESS %s\n", body.data());
+        // //Serial.printf("BRIGHTNESS %s\n", body.data());
         this->handleBrightness(params);
         break;
     case 3: //'KEY-PRESS':
-        // Serial.printf("KEY-PRESS: %s\n", body.data());
+        // //Serial.printf("KEY-PRESS: %s\n", body.data());
         // Ignore
         break;
     case 4: //'KEY-STATE':
-        // Serial.printf("KEY-STATE %s\n", body.data());
+        // //Serial.printf("KEY-STATE %s\n", body.data());
         this->handleState(params);
         break;
     case 5: //'KEYS-CLEAR':
-        Serial.printf("KEYS-CLEAR %s\n", body);
+        //Serial.printf("KEYS-CLEAR %s\n", body);
         // this.handleClear(params)
         break;
     case 6: // PING
-        Serial.printf("PING %s\n", body);
+        //Serial.printf("PING %s\n", body);
         // this.socket?.write(`PONG ${body}\n`)
         break;
     case 7: //'PONG':
         // console.log('Got pong')
-        Serial.printf("PONG %s\n", body);
+        //Serial.printf("PONG %s\n", body);
         // this._pingUnackedCount = 0
         break;
     case 8: //'REMOVE-DEVICE':
-        Serial.printf("REMOVE-DEVICE: %s\n", body);
+        //Serial.printf("REMOVE-DEVICE: %s\n", body);
         this->_deviceStatus = 0;
         break;
     default:
-        Serial.printf("Received unhandled CMD: >%s<\tBODY:>%s<\n", cmd, body);
+        //Serial.printf("Received unhandled CMD: >%s<\tBODY:>%s<\n", cmd, body);
         // console.log(`Received unhandled command: ${cmd} ${body}`)
         break;
     }
@@ -230,24 +230,24 @@ void CompanionSatellite::handleCommand(char *line)
 void CompanionSatellite::handleState(std::vector<parm> params)
 {
     // for (auto p : params)
-    //     Serial.printf("KEY: >%s< VAL: >%s<\n", p.key.size(), p.key.data(), p.val.size(), p.val.data());
+    //     //Serial.printf("KEY: >%s< VAL: >%s<\n", p.key.size(), p.key.data(), p.val.size(), p.val.data());
 
     // if (params[0].key != "DEVICEID")
     if (*params[0].key != 'D')
     {
-        Serial.printf("Mising DEVICEID in KEY-DRAW response");
+        //Serial.printf("Mising DEVICEID in KEY-DRAW response");
         return;
     }
     // if (params[1].key != "KEY")
     if (*params[1].key != 'K')
     {
-        Serial.printf("Mising KEY in KEY-DRAW response");
+        //Serial.printf("Mising KEY in KEY-DRAW response");
         return;
     }
 
     if (*params[0].val != this->_deviceId[0])
     {
-        Serial.printf("Wrong DEVICEID in ADD-DEVICE response\n");
+        //Serial.printf("Wrong DEVICEID in ADD-DEVICE response\n");
         return;
     }
 
@@ -270,10 +270,10 @@ void CompanionSatellite::handleState(std::vector<parm> params)
                 ++it->val;
                 // std::from_chars(it->val.first, it->val.second, this->DeviceDraw[keyIndex].color, 16); c++17
                 this->DeviceDraw[keyIndex].color = std::strtol(it->val, nullptr, 16);
-                Serial.printf("ALL: %d\t RED: %d\t GREEN: %d\t BLUE: %d\n", this->DeviceDraw[keyIndex].color,
-                              this->DeviceDraw[keyIndex].red,
-                              this->DeviceDraw[keyIndex].green,
-                              this->DeviceDraw[keyIndex].blue);
+                //Serial.printf("ALL: %d\t RED: %d\t GREEN: %d\t BLUE: %d\n", this->DeviceDraw[keyIndex].color,
+                            //   this->DeviceDraw[keyIndex].red,
+                            //   this->DeviceDraw[keyIndex].green,
+                            //   this->DeviceDraw[keyIndex].blue);
             }
             else if (this->_props.text && *it->key == 'T')
             {
@@ -288,7 +288,7 @@ void CompanionSatellite::handleState(std::vector<parm> params)
     }
     else
     {
-        Serial.printf("Bad KEY in KEY-DRAW response\n");
+        //Serial.printf("Bad KEY in KEY-DRAW response\n");
         return;
     }
 }
@@ -298,18 +298,18 @@ void CompanionSatellite::handleBrightness(std::vector<parm> params)
     // if (params[0].key != "DEVICEID")
     // if (*params[0].key != 'D')
     // {
-    //     Serial.printf("Mising DEVICEID in BRIGHTNESS respons\n");
+    //     //Serial.printf("Mising DEVICEID in BRIGHTNESS respons\n");
     //     return;
     // }
     // if (*params[1].key != 'V')
     // {
-    //     Serial.printf("Mising VALUE in BRIGHTNESS response\n");
+    //     //Serial.printf("Mising VALUE in BRIGHTNESS response\n");
     //     return;
     // }
 
     // if (*params[0].val != this->_deviceId[0])
     // {
-    //     Serial.printf("Wrong DEVICEID in ADD-DEVICE response\n");
+    //     //Serial.printf("Wrong DEVICEID in ADD-DEVICE response\n");
     //     return;
     // }
 
@@ -320,12 +320,12 @@ void CompanionSatellite::handleBrightness(std::vector<parm> params)
 
     if (percent >= 0)
     {
-        // Serial.printf("BRIGHTNESS: %d\n", percent);
+        // //Serial.printf("BRIGHTNESS: %d\n", percent);
         _brightness = percent;
     }
     else
     {
-        Serial.printf("Bad VALUE in BRIGHTNESS\n");
+        //Serial.printf("Bad VALUE in BRIGHTNESS\n");
         return;
     }
 
@@ -390,7 +390,7 @@ void CompanionSatellite::handleAddedDevice(std::vector<parm> params)
     {
         if (strcmp(params[2].key, "MESSAGE") == 0)
         {
-            Serial.printf("Add device failed: %s\n", params[2].val - params[2].val, params[2].val);
+            //Serial.printf("Add device failed: %s\n", params[2].val - params[2].val, params[2].val);
             // if (params[2].val.compare("Device exists elsewhere") == 0)
             // {
             //     this->removeDevice();
@@ -398,7 +398,7 @@ void CompanionSatellite::handleAddedDevice(std::vector<parm> params)
         }
         else
         {
-            Serial.printf("Add device failed: no message\n");
+            //Serial.printf("Add device failed: no message\n");
         }
         // if (typeof params.DEVICEID === 'string') {
         // 	this.emit('deviceErrored', {
@@ -411,13 +411,13 @@ void CompanionSatellite::handleAddedDevice(std::vector<parm> params)
     }
     if (strcmp(params[1].key, "DEVICEID") != 0)
     {
-        Serial.printf("Mising DEVICEID in ADD-DEVICE response");
+        //Serial.printf("Mising DEVICEID in ADD-DEVICE response");
         return;
     }
 
     if (strcmp(params[1].val, this->_deviceId.data()) != 0)
     {
-        Serial.printf("Wrong DEVICEID in ADD-DEVICE response\n");
+        //Serial.printf("Wrong DEVICEID in ADD-DEVICE response\n");
         return;
     }
 
