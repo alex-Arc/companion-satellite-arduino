@@ -1,5 +1,7 @@
-#include <Arduino.h>
+// #include <Arduino.h>
 #include <CompanionSatellite.h>
+
+#include <cstring>
 
 CompanionSatellite::CompanionSatellite(std::string deviceId, std::string productName, int keysTotal, int keysPerRow, bool bitmaps, bool color, bool text)
 {
@@ -17,13 +19,22 @@ CompanionSatellite::CompanionSatellite(std::string deviceId, std::string product
     DeviceDraw.resize(keysTotal);
 }
 
+/**
+ * 
+ * @param data null terminated char pointer
+*/
+char CompanionSatellite::parseData(char *data) {
+    return data[0];
+}
+
+
 void CompanionSatellite::maintain(bool clientStatus, char *data, size_t len)
 {
     if (clientStatus)
     {
         if (data != nullptr)
         {
-            this->_lastReceivedAt = millis();
+            this->_lastReceivedAt = 0;//millis();
             this->_handleReceivedData(data, len);
         }
         if (this->_connectionActive)
@@ -34,11 +45,11 @@ void CompanionSatellite::maintain(bool clientStatus, char *data, size_t len)
             }
             else if (this->_deviceStatus == -1)
             {
-                if (millis() - this->_addDeviceTimeout > 10000)
-                {
-                    //Serial.printf("_addDeviceTimeout\n");
-                    this->addDevice();
-                }
+                // if (millis() - this->_addDeviceTimeout > 10000)
+                // {
+                //     //Serial.printf("_addDeviceTimeout\n");
+                //     this->addDevice();
+                // }
             }
         }
     }
@@ -61,7 +72,7 @@ int CompanionSatellite::findInCmdList(char *data)
 
         const char *first2 = this->cmd_list[i];
         // //Serial.printf(">%s< ? >%s<\n", data, this->cmd_list[i]);
-        if (strcmp(data, first2) == 0) // TODO: this can be optimized
+        if (std::strcmp(data, first2) == 0) // TODO: this can be optimized
         {
             return i;
         }
@@ -78,7 +89,7 @@ std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(ch
 
     char *offset = line;
     char *itr = line;
-    const char *line_end = line + strlen(line);
+    const char *line_end = line + std::strlen(line);
     for (; itr < line_end; itr++)
     {
         if (inQuots)
@@ -122,7 +133,7 @@ std::vector<CompanionSatellite::parm> CompanionSatellite::parseLineParameters(ch
     {
         // //Serial.printf("fragment: >%s<\n", fragment);
         parm p;
-        char *equals = strchr(fragment, '=');
+        char *equals = std::strchr(fragment, '=');
         if (equals != nullptr)
         {
             *equals = 0;
@@ -344,17 +355,17 @@ void CompanionSatellite::keyDown(int keyIndex)
 
 void CompanionSatellite::keyUp(int keyIndex)
 {
-    if (this->_connectionActive)
-    {
+    // if (this->_connectionActive)
+    // {
         char ki[4];
         snprintf(ki, 4, "%d", keyIndex);
         this->transmitBuffer.append(_keyUpCmd + std::string(ki) + "\n");
-    }
+    // }
 }
 
 void CompanionSatellite::addDevice()
 {
-    _addDeviceTimeout = millis();
+    _addDeviceTimeout = 0;//millis();
     if (this->_connectionActive && this->_deviceStatus != 1)
     {
         char kt[4];
@@ -376,7 +387,7 @@ void CompanionSatellite::addDevice()
 
 void CompanionSatellite::removeDevice()
 {
-    this->_addDeviceTimeout = millis();
+    this->_addDeviceTimeout = 0;//millis();
     if (this->_connectionActive)
     {
         this->transmitBuffer.append("REMOVE-DEVICE DEVICEID=" + this->_deviceId + "\n");

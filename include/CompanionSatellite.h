@@ -1,10 +1,12 @@
 #ifndef CompanionSatellite_h
 #define CompanionSatellite_h
 
-#include <Arduino.h>
+// #include <Arduino.h>
 #include <string>
 #include <vector>
 #include <algorithm>
+
+#include <queue> // std::queue, std::swap(queue)
 
 #include <utility>
 
@@ -59,9 +61,9 @@ private:
     std::vector<parm> parseLineParameters(char *line);
     void handleCommand(char *line);
 
-    int findInCmdList(char * data);
+    int findInCmdList(char *data);
 
-    const std::vector<const char*> cmd_list = {
+    const std::vector<const char *> cmd_list = {
         "ADD-DEVICE",
         "BEGIN",
         "BRIGHTNESS",
@@ -72,7 +74,6 @@ private:
         "PONG",
         "REMOVE-DEVICE"};
 
-    void addDevice();
     void removeDevice();
     void handleAddedDevice(std::vector<parm> params);
     void handleState(std::vector<parm> params);
@@ -81,7 +82,7 @@ private:
     int _brightness = 100;
     int _deviceStatus = 0;
 
-    unsigned long _addDeviceTimeout = millis();
+    unsigned long _addDeviceTimeout = 0;//millis();
     void _handleReceivedData(char *data, size_t len);
     bool _connectionActive = false;
 
@@ -101,6 +102,21 @@ public:
     void keyUp(int keyIndex);
 
     void maintain(bool clientStatus, char *data = nullptr, size_t len = 0);
+    struct Arg
+    {
+        const char *key;
+        const char *val;
+    };
+
+    struct Command
+    {
+        const uint8_t cmd;
+        const Arg arg;
+    };
+
+    char parseData(char *data);
+    void addDevice();
+
 };
 
 #endif
