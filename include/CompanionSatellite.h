@@ -63,7 +63,7 @@ private:
 
     int findInCmdList(char *data);
 
-    enum CMD
+    enum CMD_e
     {
         CMD_NONE = -1,
         ADDDEVICE,
@@ -88,7 +88,7 @@ private:
         "PONG ",
         "REMOVE-DEVICE "};
 
-    enum ARG
+    enum ARG_e
     {
         ARG_NONE = -1,
         AV,
@@ -147,22 +147,27 @@ public:
     void keyUp(int keyIndex);
 
     void maintain(bool clientStatus, char *data = nullptr, size_t len = 0);
-    struct Parm
+
+    struct
     {
-        ARG arg;
+        ARG_e arg;
         std::string val;
     } typedef Parm_t;
 
-    struct Command
+    struct
     {
-        const CMD cmd;
-        const Parm parm;
-    };
+        const CMD_e cmd;
+        std::vector<Parm_t> parm;
+    }typedef cmd_t;
 
-    CMD parseCmdType(const char *data);
+    std::vector<cmd_t> _cmd_buffer;
+
+    const char *_cursor = nullptr;
+
+    CMD_e parseCmdType(const char *data);
     Parm_t parseParameters(const char *data);
     int parseData(const std::string data);
+
     void addDevice();
 };
-
 #endif

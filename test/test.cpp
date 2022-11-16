@@ -1,5 +1,5 @@
 #ifndef NATIVE
-  #include <Arduino.h>
+#include <Arduino.h>
 #endif
 
 #include <unity.h>
@@ -111,18 +111,18 @@ void test_Satellite_parseParameters_Arg_list()
 {
   CompanionSatellite cs("1234", "Test", 4, 2);
   const std::vector<std::string> list = {
-        "ApiVersion ",
-        "BITMAP ",
-        "COLOR ",
-        "CompanionVersion ",
-        "DEVICEID ",
-        "DIRECTION ",
-        "ERROR ",
-        "KEY ",
-        "OK ",
-        "PRESSED ",
-        "TEXT ",
-        "TYPE "};
+      "ApiVersion ",
+      "BITMAP ",
+      "COLOR ",
+      "CompanionVersion ",
+      "DEVICEID ",
+      "DIRECTION ",
+      "ERROR ",
+      "KEY ",
+      "OK ",
+      "PRESSED ",
+      "TEXT ",
+      "TYPE "};
 
   for (uint8_t i = 0; i < list.size(); i++)
   {
@@ -135,18 +135,18 @@ void test_Satellite_parseParameters_Pass_list()
 {
   CompanionSatellite cs("1234", "Test", 4, 2);
   const std::vector<std::string> list = {
-        "ApiVersion=1234 ",
-        "BITMAP\n",
-        "COLOR=1 ",
-        "CompanionVersion=1\n",
-        "DEVICEID\n",
-        "DIRECTION    ",
-        "ERROR \n",
-        "KEY=wg?\n",
-        "OK\n",
-        "PRESSED\n",
-        "TEXT\n",
-        "TYPE\n"};
+      "ApiVersion=1234 ",
+      "BITMAP\n",
+      "COLOR=1 ",
+      "CompanionVersion=1\n",
+      "DEVICEID\n",
+      "DIRECTION    ",
+      "ERROR \n",
+      "KEY=wg?\n",
+      "OK\n",
+      "PRESSED\n",
+      "TEXT\n",
+      "TYPE\n"};
 
   for (uint8_t i = 0; i < list.size(); i++)
   {
@@ -159,18 +159,18 @@ void test_Satellite_parseParameters_Wrong_list()
 {
   CompanionSatellite cs("1234", "Test", 4, 2);
   const std::vector<std::string> list = {
-        "ApiVersion=1",
-        " BITMAP#",
-        "\nCOLOR=",
-        "Compani3onVersion\n",
-        "DEVasdfgICEIDh",
-        "DIRECTION5",
-        "ERROR+",
-        "KEY?",
-        "OKOK'",
-        "851320PRESSED-",
-        "TwEXT.",
-        "TYyPE,"};
+      "ApiVersion=1",
+      " BITMAP#",
+      "\nCOLOR=",
+      "Compani3onVersion\n",
+      "DEVasdfgICEIDh",
+      "DIRECTION5",
+      "ERROR+",
+      "KEY?",
+      "OKOK'",
+      "851320PRESSED-",
+      "TwEXT.",
+      "TYyPE,"};
 
   for (uint8_t i = 0; i < list.size(); i++)
   {
@@ -196,40 +196,54 @@ void test_Satellite_parseParameters_Value_list()
   a = cs.parseParameters(input.data());
   TEST_ASSERT_EQUAL_INT32_MESSAGE(0, a.arg, input.data());
   TEST_ASSERT_EQUAL_CHAR_ARRAY_MESSAGE("1234\n13465", a.val.data(), 10, input.data());
-
 }
 
-// void test_Satellite_addDevice()
-// {
-//   {
-//     CompanionSatellite cs("1234", "Test", 4, 2);
-//     cs.addDevice();
-//     std::string exp = "ADD-DEVICE DEVICEID=1234 PRODUCT_NAME=\"Test\" KEYS_TOTAL=4 KEYS_PER_ROW=2 BITMAPS=0 COLORS=0 TEXT=0\n";
-//     std::string act = cs.transmitBuffer;
-//     TEST_ASSERT_EQUAL_STRING(exp.data(), act.data());
-//   }
-//   {
-//     CompanionSatellite cs("5678", "yyyy", 9, 3);
-//     cs.addDevice();
-//     std::string exp = "ADD-DEVICE DEVICEID=5678 PRODUCT_NAME=\"yyyy\" KEYS_TOTAL=9 KEYS_PER_ROW=3 BITMAPS=0 COLORS=0 TEXT=0\n";
-//     std::string act = cs.transmitBuffer;
-//     TEST_ASSERT_EQUAL_STRING(exp.data(), act.data());
-//   }
-// }
+void test_Satellite_parseData_Good()
+{
+  CompanionSatellite cs("1234", "Test", 4, 2);
+  std::string input = "BEGIN CompanionVersion=2.3.1+4641-v2-3.1-dc01ac7c ApiVersion=1.2.0\nBEGIN CompanionVersion=2.3.1+4641-v2-3.1-dc01ac7c ApiVersion=1.2.0\n";
+  int a = cs.parseData(input);
+
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(2, cs._cmd_buffer.at(0).parm.size(), input.data());
+
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(1, cs._cmd_buffer.at(0).cmd, input.data());
+
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(3, cs._cmd_buffer.at(0).parm.at(0).arg, input.data());
+  TEST_ASSERT_EQUAL_CHAR_ARRAY_MESSAGE("2.3.1+4641-v2-3.1-dc01ac7c", cs._cmd_buffer.at(0).parm.at(0).val.data(), 17, input.data());
+
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(0, cs._cmd_buffer.at(0).parm.at(1).arg, input.data());
+  TEST_ASSERT_EQUAL_CHAR_ARRAY_MESSAGE("1.2.0", cs._cmd_buffer.at(0).parm.at(1).val.data(), 6, input.data());
+
+
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(2, cs._cmd_buffer.at(1).parm.size(), input.data());
+
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(1, cs._cmd_buffer.at(1).cmd, input.data());
+
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(3, cs._cmd_buffer.at(1).parm.at(0).arg, input.data());
+  TEST_ASSERT_EQUAL_CHAR_ARRAY_MESSAGE("2.3.1+4641-v2-3.1-dc01ac7c", cs._cmd_buffer.at(0).parm.at(0).val.data(), 17, input.data());
+
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(0, cs._cmd_buffer.at(1).parm.at(1).arg, input.data());
+  TEST_ASSERT_EQUAL_CHAR_ARRAY_MESSAGE("1.2.0", cs._cmd_buffer.at(0).parm.at(1).val.data(), 6, input.data());
+
+}
 
 int main(int argc, char **argv)
 {
   UNITY_BEGIN();
   RUN_TEST(test_encode_b64);
   RUN_TEST(test_decode_b64);
+
   RUN_TEST(test_Satellite_parseCmdTypeCmd_list);
   RUN_TEST(test_Satellite_parseCmdTypePass_list);
   RUN_TEST(test_Satellite_parseCmdTypeWrong_list);
   RUN_TEST(test_Satellite_parseCmdTypeLong);
+
   RUN_TEST(test_Satellite_parseParameters_Arg_list);
   RUN_TEST(test_Satellite_parseParameters_Pass_list);
   RUN_TEST(test_Satellite_parseParameters_Wrong_list);
   RUN_TEST(test_Satellite_parseParameters_Value_list);
+
+  RUN_TEST(test_Satellite_parseData_Good);
   // RUN_TEST(test_Satellite_addDevice);
   UNITY_END();
 }

@@ -45,9 +45,9 @@ CompanionSatellite::CompanionSatellite(const char *deviceId, const char *product
  * expects the first word i the string to be a valid command
  *
  * @param data string ptr to search.
- * @return CMD enum.
+ * @return CMD_e enum.
  */
-CompanionSatellite::CMD CompanionSatellite::parseCmdType(const char *data)
+CompanionSatellite::CMD_e CompanionSatellite::parseCmdType(const char *data)
 {
     auto cmd = std::lower_bound(cmd_list.begin(), cmd_list.end(), data,
                                 [](std::string from_list, const char *from_data)
@@ -55,11 +55,12 @@ CompanionSatellite::CMD CompanionSatellite::parseCmdType(const char *data)
 
     if (cmd != cmd_list.end() && cmd->compare(0, std::string::npos, data, 0, cmd->size()) == 0)
     {
-        return (CompanionSatellite::CMD)std::distance(cmd_list.begin(), cmd);
+        this->_cursor = data + cmd->size();
+        return (CompanionSatellite::CMD_e)std::distance(cmd_list.begin(), cmd);
     }
     else
     {
-        return CompanionSatellite::CMD::CMD_NONE;
+        return CompanionSatellite::CMD_e::CMD_NONE;
     }
 }
 
@@ -85,8 +86,9 @@ CompanionSatellite::Parm_t CompanionSatellite::parseParameters(const char *data)
         case ' ':
         {
             Parm_t parm = {
-                .arg = (CompanionSatellite::ARG)std::distance(arg_list.begin(), arg),
+                .arg = (ARG_e)std::distance(arg_list.begin(), arg),
                 .val = "t"};
+            this->_cursor = data + arg->size() + 1;
             return parm;
         }
         break;
@@ -106,14 +108,15 @@ CompanionSatellite::Parm_t CompanionSatellite::parseParameters(const char *data)
             if (ve != nullptr)
             {
                 Parm_t parm = {
-                    .arg = (CompanionSatellite::ARG)std::distance(arg_list.begin(), arg),
+                    .arg = (ARG_e)std::distance(arg_list.begin(), arg),
                     .val = std::string(vs, ve - vs)};
+                this->_cursor = ve + 1;
                 return parm;
             }
             else
             {
                 Parm_t parm = {
-                    .arg = CompanionSatellite::ARG::ARG_NONE,
+                    .arg = ARG_e::ARG_NONE,
                     .val = "f"};
                 return parm;
             }
@@ -122,7 +125,7 @@ CompanionSatellite::Parm_t CompanionSatellite::parseParameters(const char *data)
         default:
         {
             Parm_t parm = {
-                .arg = CompanionSatellite::ARG::ARG_NONE,
+                .arg = ARG_e::ARG_NONE,
                 .val = "f"};
             return parm;
         }
@@ -132,19 +135,31 @@ CompanionSatellite::Parm_t CompanionSatellite::parseParameters(const char *data)
     else
     {
         Parm_t parm = {
-            .arg = CompanionSatellite::ARG::ARG_NONE,
+            .arg = ARG_e::ARG_NONE,
             .val = "none"};
         return parm;
     }
 }
 
-/**
- *
- * @param data null terminated char pointer
- */
 int CompanionSatellite::parseData(const std::string data)
 {
-    return -1;
+    this->_cursor = data.data();
+    int ret = -1;
+    for (CMD_e cmd = parseCmdType(_cursor); cmd != CMD_e::CMD_NONE; cmd = parseCmdType(_cursor))
+    {
+        cmd_t command = {.cmd = cmd};
+        Parm_t parm = parseParameters(_cursor);
+        while (parm.arg != ARG_e::ARG_NONE)
+        {
+            command.parm.push_back(parm);
+            parm = parseParameters(_cursor);
+        }
+
+        this->_cmd_buffer.push_back(std::move(command));
+        ret++;
+    }
+
+    return ret;
 }
 
 // void CompanionSatellite::maintain(bool clientStatus, char *data, size_t len)
