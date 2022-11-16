@@ -4,11 +4,11 @@
 // #include <Arduino.h>
 #include <string>
 #include <vector>
-#include <algorithm>
+// #include <algorithm>
 
-#include <queue> // std::queue, std::swap(queue)
+// #include <queue> // std::queue, std::swap(queue)
 
-#include <utility>
+// #include <utility>
 
 #include <B64.h>
 
@@ -63,16 +63,61 @@ private:
 
     int findInCmdList(char *data);
 
-    const std::vector<const char *> cmd_list = {
-        "ADD-DEVICE",
-        "BEGIN",
-        "BRIGHTNESS",
-        "KEY-PRESS",
-        "KEY-STATE",
-        "KEYS-CLEAR",
-        "PING",
-        "PONG",
-        "REMOVE-DEVICE"};
+    enum CMD
+    {
+        CMD_NONE = -1,
+        ADDDEVICE,
+        BEGIN,
+        BRIGHTNESS,
+        KEYPRESS,
+        KEYSTATE,
+        KEYSCLEAR,
+        PING,
+        PONG,
+        REMOVEDEVICE
+    };
+
+    const std::vector<std::string> cmd_list = {
+        "ADD-DEVICE ",
+        "BEGIN ",
+        "BRIGHTNESS ",
+        "KEY-PRESS ",
+        "KEY-STATE ",
+        "KEYS-CLEAR ",
+        "PING ",
+        "PONG ",
+        "REMOVE-DEVICE "};
+
+    enum ARG
+    {
+        ARG_NONE = -1,
+        AV,
+        BITMAP,
+        COLOR,
+        CV,
+        DEVICEID,
+        DIRECTION,
+        ERROR,
+        KEY,
+        OK,
+        PRESSED,
+        TEXT,
+        TYPE
+    };
+
+    const std::vector<std::string> arg_list = {
+        "ApiVersion",
+        "BITMAP",
+        "COLOR",
+        "CompanionVersion",
+        "DEVICEID",
+        "DIRECTION",
+        "ERROR",
+        "KEY",
+        "OK",
+        "PRESSED",
+        "TEXT",
+        "TYPE"};
 
     void removeDevice();
     void handleAddedDevice(std::vector<parm> params);
@@ -82,15 +127,15 @@ private:
     int _brightness = 100;
     int _deviceStatus = 0;
 
-    unsigned long _addDeviceTimeout = 0;//millis();
+    unsigned long _addDeviceTimeout = 0; // millis();
     void _handleReceivedData(char *data, size_t len);
     bool _connectionActive = false;
-
     std::string _keyUpCmd;
     std::string _keyDownCmd;
 
 public:
     CompanionSatellite(std::string deviceId, std::string productName, int keysTotal, int keysPerRow, bool bitmaps = false, bool color = false, bool text = false);
+    CompanionSatellite(const char *deviceId, const char *productName, int keysTotal, int keysPerRow, bool bitmaps = false, bool color = false, bool text = false);
 
     std::string transmitBuffer;
 
@@ -102,21 +147,22 @@ public:
     void keyUp(int keyIndex);
 
     void maintain(bool clientStatus, char *data = nullptr, size_t len = 0);
-    struct Arg
+    struct Parm
     {
-        const char *key;
-        const char *val;
-    };
+        ARG arg;
+        std::string val;
+    } typedef Parm_t;
 
     struct Command
     {
-        const uint8_t cmd;
-        const Arg arg;
+        const CMD cmd;
+        const Parm parm;
     };
 
-    char parseData(char *data);
+    CMD parseCmdType(const char *data);
+    Parm_t parseParameters(const char *data);
+    int parseData(const std::string data);
     void addDevice();
-
 };
 
 #endif
