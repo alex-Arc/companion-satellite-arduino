@@ -42,7 +42,7 @@ CompanionSatellite::CompanionSatellite(const char *deviceId, const char *product
 /**
  * Find the matching command.
  *
- * expects the first word i the string to be a valid command
+ * expects the first word in the string to be a valid command
  *
  * @param data string ptr to search.
  * @return CMD_e enum.
@@ -50,7 +50,7 @@ CompanionSatellite::CompanionSatellite(const char *deviceId, const char *product
 CompanionSatellite::CMD_e CompanionSatellite::parseCmdType(const char *data)
 {
     while (*data == ' ' || *data == '\n')
-                ++data;
+        ++data;
 
     auto cmd = std::lower_bound(cmd_list.begin(), cmd_list.end(), data,
                                 [](std::string from_list, const char *from_data)
@@ -69,16 +69,13 @@ CompanionSatellite::CMD_e CompanionSatellite::parseCmdType(const char *data)
 
 /**
  * Find Parameters.
- *
- *
- *
  * @param data string ptr to search.
  * @return Parm_t.
  */
 CompanionSatellite::Parm_t CompanionSatellite::parseParameters(const char *data)
 {
     while (*data == ' ' || *data == '\n')
-                ++data;
+        ++data;
 
     auto arg = std::lower_bound(arg_list.begin(), arg_list.end(), data,
                                 [](std::string from_list, const char *from_data)
@@ -91,11 +88,10 @@ CompanionSatellite::Parm_t CompanionSatellite::parseParameters(const char *data)
         case '\n':
         case ' ':
         {
-            Parm_t parm = {
+            this->_cursor = data + arg->size() + 1;
+            return Parm_t{
                 .arg = (ARG_e)std::distance(arg_list.begin(), arg),
                 .val = "t"};
-            this->_cursor = data + arg->size() + 1;
-            return parm;
         }
         break;
         case '=':
@@ -113,38 +109,33 @@ CompanionSatellite::Parm_t CompanionSatellite::parseParameters(const char *data)
             }
             if (ve != nullptr)
             {
-                Parm_t parm = {
+                this->_cursor = ve + 1;
+                return Parm_t{
                     .arg = (ARG_e)std::distance(arg_list.begin(), arg),
                     .val = std::string(vs, ve - vs)};
-
-                this->_cursor = ve + 1;
-                return parm;
             }
             else
             {
-                Parm_t parm = {
+                return Parm_t{
                     .arg = ARG_e::ARG_NONE,
                     .val = "f"};
-                return parm;
             }
         }
         break;
         default:
         {
-            Parm_t parm = {
+            return Parm_t{
                 .arg = ARG_e::ARG_NONE,
                 .val = "f"};
-            return parm;
         }
         break;
         }
     }
     else
     {
-        Parm_t parm = {
+        return Parm_t{
             .arg = ARG_e::ARG_NONE,
             .val = "none"};
-        return parm;
     }
 }
 
