@@ -111,18 +111,18 @@ void test_Satellite_parseParameters_Arg_list()
 {
   CompanionSatellite cs("1234", "Test", 4, 2);
   const std::vector<std::string> list = {
-        "ApiVersion",
-        "BITMAP",
-        "COLOR",
-        "CompanionVersion",
-        "DEVICEID",
-        "DIRECTION",
-        "ERROR",
-        "KEY",
-        "OK",
-        "PRESSED",
-        "TEXT",
-        "TYPE"};
+        "ApiVersion ",
+        "BITMAP ",
+        "COLOR ",
+        "CompanionVersion ",
+        "DEVICEID ",
+        "DIRECTION ",
+        "ERROR ",
+        "KEY ",
+        "OK ",
+        "PRESSED ",
+        "TEXT ",
+        "TYPE "};
 
   for (uint8_t i = 0; i < list.size(); i++)
   {
@@ -135,18 +135,18 @@ void test_Satellite_parseParameters_Pass_list()
 {
   CompanionSatellite cs("1234", "Test", 4, 2);
   const std::vector<std::string> list = {
-        "ApiVersion ",
-        "BITMAP#",
-        "COLOR=",
-        "CompanionVersion\n",
-        "DEVICEIDh",
-        "DIRECTION5",
-        "ERROR+",
-        "KEY?",
-        "OK'",
-        "PRESSED-",
-        "TEXT.",
-        "TYPE,"};
+        "ApiVersion=1234 ",
+        "BITMAP\n",
+        "COLOR=1 ",
+        "CompanionVersion=1\n",
+        "DEVICEID\n",
+        "DIRECTION    ",
+        "ERROR \n",
+        "KEY=wg?\n",
+        "OK\n",
+        "PRESSED\n",
+        "TEXT\n",
+        "TYPE\n"};
 
   for (uint8_t i = 0; i < list.size(); i++)
   {
@@ -159,7 +159,7 @@ void test_Satellite_parseParameters_Wrong_list()
 {
   CompanionSatellite cs("1234", "Test", 4, 2);
   const std::vector<std::string> list = {
-        "ApiVgersion ",
+        "ApiVersion=1",
         " BITMAP#",
         "\nCOLOR=",
         "Compani3onVersion\n",
@@ -177,6 +177,26 @@ void test_Satellite_parseParameters_Wrong_list()
     CompanionSatellite::Parm_t a = cs.parseParameters(list.at(i).data());
     TEST_ASSERT_EQUAL_INT32_MESSAGE(-1, a.arg, list.at(i).data());
   }
+}
+
+void test_Satellite_parseParameters_Value_list()
+{
+  CompanionSatellite cs("1234", "Test", 4, 2);
+  std::string input = "ApiVersion=1234 13465";
+  CompanionSatellite::Parm_t a = cs.parseParameters(input.data());
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(0, a.arg, input.data());
+  TEST_ASSERT_EQUAL_CHAR_ARRAY_MESSAGE("1234", a.val.data(), 4, input.data());
+
+  input = "ApiVersion=\"1234 13465\"";
+  a = cs.parseParameters(input.data());
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(0, a.arg, input.data());
+  TEST_ASSERT_EQUAL_CHAR_ARRAY_MESSAGE("1234 13465", a.val.data(), 10, input.data());
+
+  input = "ApiVersion=\"1234\n13465\"";
+  a = cs.parseParameters(input.data());
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(0, a.arg, input.data());
+  TEST_ASSERT_EQUAL_CHAR_ARRAY_MESSAGE("1234\n13465", a.val.data(), 10, input.data());
+
 }
 
 // void test_Satellite_addDevice()
@@ -209,6 +229,7 @@ int main(int argc, char **argv)
   RUN_TEST(test_Satellite_parseParameters_Arg_list);
   RUN_TEST(test_Satellite_parseParameters_Pass_list);
   RUN_TEST(test_Satellite_parseParameters_Wrong_list);
+  RUN_TEST(test_Satellite_parseParameters_Value_list);
   // RUN_TEST(test_Satellite_addDevice);
   UNITY_END();
 }

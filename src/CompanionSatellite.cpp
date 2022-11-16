@@ -1,10 +1,10 @@
 // #include <Arduino.h>
 #include <CompanionSatellite.h>
 
-#include <cstring>
-#include <string>
 #include <algorithm>
+#include <cstring>
 #include <iterator>
+#include <string>
 #include <vector>
 
 CompanionSatellite::CompanionSatellite(std::string deviceId, std::string productName, int keysTotal, int keysPerRow, bool bitmaps, bool color, bool text)
@@ -81,6 +81,7 @@ CompanionSatellite::Parm_t CompanionSatellite::parseParameters(const char *data)
     {
         switch (data[arg->size()])
         {
+        case '\n':
         case ' ':
         {
             Parm_t parm = {
@@ -91,13 +92,23 @@ CompanionSatellite::Parm_t CompanionSatellite::parseParameters(const char *data)
         break;
         case '=':
         {
-            const char *vs = data + arg->size();
-            const char *ve = std::strpbrk(vs, " \n");
+            const char *vs = data + arg->size() + 1;
+            const char *ve;
+            if (*vs == '\"')
+            {
+                ++vs;
+                ve = std::strpbrk(vs, "\"");
+            }
+            else
+            {
+                ve = std::strpbrk(vs, " \n");
+            }
             if (ve != nullptr)
             {
                 Parm_t parm = {
                     .arg = (CompanionSatellite::ARG)std::distance(arg_list.begin(), arg),
-                    .val = std::string(vs, ve-vs)};
+                    .val = std::string(vs, ve - vs)};
+                return parm;
             }
             else
             {
