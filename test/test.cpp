@@ -201,31 +201,28 @@ void test_Satellite_parseParameters_Value_list()
 void test_Satellite_parseData_Good()
 {
   CompanionSatellite cs("1234", "Test", 4, 2);
-  std::string input = "BEGIN CompanionVersion=2.3.1+4641-v2-3.1-dc01ac7c ApiVersion=1.2.0\nBEGIN CompanionVersion=2.3.1+4641-v2-3.1-dc01ac7c ApiVersion=1.2.0\n";
+  std::string input = "BEGIN CompanionVersion=2.3.1+4641-v2-3.1-dc01ac7c ApiVersion=1.2.0\nBEGIN CompanionVersion=8.3.1+4641-v2-3.1-dc01ac7c ApiVersion=7.2.0\n";
   int a = cs.parseData(input);
 
-  TEST_ASSERT_EQUAL_INT32_MESSAGE(2, cs._cmd_buffer.at(0).parm.size(), input.data());
-
-  TEST_ASSERT_EQUAL_INT32_MESSAGE(1, cs._cmd_buffer.at(0).cmd, input.data());
-
-  TEST_ASSERT_EQUAL_INT32_MESSAGE(3, cs._cmd_buffer.at(0).parm.at(0).arg, input.data());
+  // 2 commands
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(2, cs._cmd_buffer.size(), input.data());
+  
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(2, cs._cmd_buffer.at(0).parm.size(), input.data()); // 2 parms
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(1, cs._cmd_buffer.at(0).cmd, input.data());   //BEGIN
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(3, cs._cmd_buffer.at(0).parm.at(0).arg, input.data());    //CompanionVersion
   TEST_ASSERT_EQUAL_CHAR_ARRAY_MESSAGE("2.3.1+4641-v2-3.1-dc01ac7c", cs._cmd_buffer.at(0).parm.at(0).val.data(), 17, input.data());
-
-  TEST_ASSERT_EQUAL_INT32_MESSAGE(0, cs._cmd_buffer.at(0).parm.at(1).arg, input.data());
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(0, cs._cmd_buffer.at(0).parm.at(1).arg, input.data());  //ApiVersion
   TEST_ASSERT_EQUAL_CHAR_ARRAY_MESSAGE("1.2.0", cs._cmd_buffer.at(0).parm.at(1).val.data(), 6, input.data());
 
-
-  TEST_ASSERT_EQUAL_INT32_MESSAGE(2, cs._cmd_buffer.at(1).parm.size(), input.data());
-
-  TEST_ASSERT_EQUAL_INT32_MESSAGE(1, cs._cmd_buffer.at(1).cmd, input.data());
-
-  TEST_ASSERT_EQUAL_INT32_MESSAGE(3, cs._cmd_buffer.at(1).parm.at(0).arg, input.data());
-  TEST_ASSERT_EQUAL_CHAR_ARRAY_MESSAGE("2.3.1+4641-v2-3.1-dc01ac7c", cs._cmd_buffer.at(0).parm.at(0).val.data(), 17, input.data());
-
-  TEST_ASSERT_EQUAL_INT32_MESSAGE(0, cs._cmd_buffer.at(1).parm.at(1).arg, input.data());
-  TEST_ASSERT_EQUAL_CHAR_ARRAY_MESSAGE("1.2.0", cs._cmd_buffer.at(0).parm.at(1).val.data(), 6, input.data());
-
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(2, cs._cmd_buffer.at(1).parm.size(), input.data()); // 2 parms
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(1, cs._cmd_buffer.at(1).cmd, input.data());   //BEGIN
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(3, cs._cmd_buffer.at(1).parm.at(0).arg, input.data());    //CompanionVersion
+  TEST_ASSERT_EQUAL_CHAR_ARRAY_MESSAGE("8.3.1+4641-v2-3.1-dc01ac7c", cs._cmd_buffer.at(1).parm.at(0).val.data(), 17, input.data());
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(0, cs._cmd_buffer.at(1).parm.at(1).arg, input.data());  //ApiVersion
+  TEST_ASSERT_EQUAL_CHAR_ARRAY_MESSAGE("7.2.0", cs._cmd_buffer.at(1).parm.at(1).val.data(), 6, input.data());
 }
+
+
 
 int main(int argc, char **argv)
 {
@@ -244,6 +241,7 @@ int main(int argc, char **argv)
   RUN_TEST(test_Satellite_parseParameters_Value_list);
 
   RUN_TEST(test_Satellite_parseData_Good);
-  // RUN_TEST(test_Satellite_addDevice);
+
+  RUN_TEST(test_Satellite_addDevice);
   UNITY_END();
 }

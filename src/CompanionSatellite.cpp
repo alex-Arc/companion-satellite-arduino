@@ -145,18 +145,20 @@ int CompanionSatellite::parseData(const std::string data)
 {
     this->_cursor = data.data();
     int ret = -1;
-    for (CMD_e cmd = parseCmdType(_cursor); cmd != CMD_e::CMD_NONE; cmd = parseCmdType(_cursor))
+    CMD_e cmd = parseCmdType(_cursor);
+    while (cmd != CMD_e::CMD_NONE)
     {
         cmd_t command = {.cmd = cmd};
         Parm_t parm = parseParameters(_cursor);
         while (parm.arg != ARG_e::ARG_NONE)
         {
-            command.parm.push_back(parm);
+            command.parm.push_back(std::move(parm));
             parm = parseParameters(_cursor);
         }
 
         this->_cmd_buffer.push_back(std::move(command));
         ret++;
+        cmd = parseCmdType(_cursor);
     }
 
     return ret;
