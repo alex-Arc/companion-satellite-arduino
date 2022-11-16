@@ -102,7 +102,8 @@ private:
         OK,
         PRESSED,
         TEXT,
-        TYPE
+        TYPE,
+        VALUE
     };
 
     const std::vector<std::string> arg_list = {
@@ -117,7 +118,8 @@ private:
         "OK",
         "PRESSED",
         "TEXT",
-        "TYPE"};
+        "TYPE",
+        "VALUE"};
 
     void removeDevice();
     void handleAddedDevice(std::vector<parm> params);

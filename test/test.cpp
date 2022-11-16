@@ -185,17 +185,17 @@ void test_Satellite_parseParameters_Value_list()
   std::string input = "ApiVersion=1234 13465";
   CompanionSatellite::Parm_t a = cs.parseParameters(input.data());
   TEST_ASSERT_EQUAL_INT32_MESSAGE(0, a.arg, input.data());
-  TEST_ASSERT_EQUAL_CHAR_ARRAY_MESSAGE("1234", a.val.data(), 4, input.data());
+  TEST_ASSERT_EQUAL_STRING_MESSAGE("1234", a.val.data(), input.data());
 
   input = "ApiVersion=\"1234 13465\"";
   a = cs.parseParameters(input.data());
   TEST_ASSERT_EQUAL_INT32_MESSAGE(0, a.arg, input.data());
-  TEST_ASSERT_EQUAL_CHAR_ARRAY_MESSAGE("1234 13465", a.val.data(), 10, input.data());
+  TEST_ASSERT_EQUAL_STRING_MESSAGE("1234 13465", a.val.data(), input.data());
 
   input = "ApiVersion=\"1234\n13465\"";
   a = cs.parseParameters(input.data());
   TEST_ASSERT_EQUAL_INT32_MESSAGE(0, a.arg, input.data());
-  TEST_ASSERT_EQUAL_CHAR_ARRAY_MESSAGE("1234\n13465", a.val.data(), 10, input.data());
+  TEST_ASSERT_EQUAL_STRING_MESSAGE("1234\n13465", a.val.data(), input.data());
 }
 
 void test_Satellite_parseData_Good()
@@ -206,23 +206,83 @@ void test_Satellite_parseData_Good()
 
   // 2 commands
   TEST_ASSERT_EQUAL_INT32_MESSAGE(2, cs._cmd_buffer.size(), input.data());
-  
-  TEST_ASSERT_EQUAL_INT32_MESSAGE(2, cs._cmd_buffer.at(0).parm.size(), input.data()); // 2 parms
-  TEST_ASSERT_EQUAL_INT32_MESSAGE(1, cs._cmd_buffer.at(0).cmd, input.data());   //BEGIN
-  TEST_ASSERT_EQUAL_INT32_MESSAGE(3, cs._cmd_buffer.at(0).parm.at(0).arg, input.data());    //CompanionVersion
-  TEST_ASSERT_EQUAL_CHAR_ARRAY_MESSAGE("2.3.1+4641-v2-3.1-dc01ac7c", cs._cmd_buffer.at(0).parm.at(0).val.data(), 17, input.data());
-  TEST_ASSERT_EQUAL_INT32_MESSAGE(0, cs._cmd_buffer.at(0).parm.at(1).arg, input.data());  //ApiVersion
-  TEST_ASSERT_EQUAL_CHAR_ARRAY_MESSAGE("1.2.0", cs._cmd_buffer.at(0).parm.at(1).val.data(), 6, input.data());
 
-  TEST_ASSERT_EQUAL_INT32_MESSAGE(2, cs._cmd_buffer.at(1).parm.size(), input.data()); // 2 parms
-  TEST_ASSERT_EQUAL_INT32_MESSAGE(1, cs._cmd_buffer.at(1).cmd, input.data());   //BEGIN
-  TEST_ASSERT_EQUAL_INT32_MESSAGE(3, cs._cmd_buffer.at(1).parm.at(0).arg, input.data());    //CompanionVersion
-  TEST_ASSERT_EQUAL_CHAR_ARRAY_MESSAGE("8.3.1+4641-v2-3.1-dc01ac7c", cs._cmd_buffer.at(1).parm.at(0).val.data(), 17, input.data());
-  TEST_ASSERT_EQUAL_INT32_MESSAGE(0, cs._cmd_buffer.at(1).parm.at(1).arg, input.data());  //ApiVersion
-  TEST_ASSERT_EQUAL_CHAR_ARRAY_MESSAGE("7.2.0", cs._cmd_buffer.at(1).parm.at(1).val.data(), 6, input.data());
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(2, cs._cmd_buffer.at(0).parm.size(), input.data());    // 2 parms
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(1, cs._cmd_buffer.at(0).cmd, input.data());            // BEGIN
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(3, cs._cmd_buffer.at(0).parm.at(0).arg, input.data()); // CompanionVersion
+  TEST_ASSERT_EQUAL_STRING_MESSAGE("2.3.1+4641-v2-3.1-dc01ac7c", cs._cmd_buffer.at(0).parm.at(0).val.data(), input.data());
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(0, cs._cmd_buffer.at(0).parm.at(1).arg, input.data()); // ApiVersion
+  TEST_ASSERT_EQUAL_STRING_MESSAGE("1.2.0", cs._cmd_buffer.at(0).parm.at(1).val.data(), input.data());
+
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(2, cs._cmd_buffer.at(1).parm.size(), input.data());    // 2 parms
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(1, cs._cmd_buffer.at(1).cmd, input.data());            // BEGIN
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(3, cs._cmd_buffer.at(1).parm.at(0).arg, input.data()); // CompanionVersion
+  TEST_ASSERT_EQUAL_STRING_MESSAGE("8.3.1+4641-v2-3.1-dc01ac7c", cs._cmd_buffer.at(1).parm.at(0).val.data(), input.data());
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(0, cs._cmd_buffer.at(1).parm.at(1).arg, input.data()); // ApiVersion
+  TEST_ASSERT_EQUAL_STRING_MESSAGE("7.2.0", cs._cmd_buffer.at(1).parm.at(1).val.data(), input.data());
 }
 
+void test_Satellite_full_connect()
+{
+  CompanionSatellite cs("1234", "Test", 4, 2);
+  cs.addDevice();
+  TEST_ASSERT_EQUAL_STRING("ADD-DEVICE DEVICEID=1234 PRODUCT_NAME=\"Test\" KEYS_TOTAL=4 KEYS_PER_ROW=2 BITMAPS=0 COLORS=0 TEXT=0\n", cs.transmitBuffer.data());
+  std::string input = "BEGIN CompanionVersion=2.3.1+4641-v2-3.1-dc01ac7c ApiVersion=1.2.0\n";
+  int a = cs.parseData(input);
 
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(1, cs._cmd_buffer.size(), input.data()); //1 Command
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(1, cs._cmd_buffer.at(0).cmd, input.data());            // BEGIN
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(2, cs._cmd_buffer.at(0).parm.size(), input.data());    // 2 parms
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(3, cs._cmd_buffer.at(0).parm.at(0).arg, input.data()); // CompanionVersion
+  TEST_ASSERT_EQUAL_STRING_MESSAGE("2.3.1+4641-v2-3.1-dc01ac7c", cs._cmd_buffer.at(0).parm.at(0).val.data(), input.data());
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(0, cs._cmd_buffer.at(0).parm.at(1).arg, input.data()); // ApiVersion
+  TEST_ASSERT_EQUAL_STRING_MESSAGE("1.2.0", cs._cmd_buffer.at(0).parm.at(1).val.data(), input.data());
+
+  cs._cmd_buffer.clear();
+
+  input = "ADD-DEVICE OK DEVICEID=\"1234\"\nBRIGHTNESS DEVICEID=1234 VALUE=100\nKEY-STATE DEVICEID=1234    KEY=0 TYPE=PAGEUP  PRESSED=false\nKEY-STATE DEVICEID=1234 KEY=1 TYPE=BUTTON  PRESSED=false\nKEY-STATE DEVICEID=1234 KEY=2 TYPE=PAGENUM  PRESSED=false\nKEY-STATE DEVICEID=1234 KEY=3 TYPE=BUTTON  PRESSED=false\n";
+
+
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(6, cs.parseData(input), "ret 6");
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(6, cs._cmd_buffer.size(), "6 Commands");
+  
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(0, cs._cmd_buffer.at(0).cmd, "ADD-DEVICE");
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(2, cs._cmd_buffer.at(0).parm.size(), "2 Parm");
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(8, cs._cmd_buffer.at(0).parm.at(0).arg, "OK");
+  TEST_ASSERT_EQUAL_STRING("t", cs._cmd_buffer.at(0).parm.at(0).val.data());
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(4, cs._cmd_buffer.at(0).parm.at(1).arg, "DEVICEID");
+  TEST_ASSERT_EQUAL_STRING("1234", cs._cmd_buffer.at(0).parm.at(1).val.data());
+
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(2, cs._cmd_buffer.at(1).cmd, "BRIGHTNESS");
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(2, cs._cmd_buffer.at(1).parm.size(), "2 Parm");
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(4, cs._cmd_buffer.at(1).parm.at(0).arg, "DEVICEID");
+  TEST_ASSERT_EQUAL_STRING("1234", cs._cmd_buffer.at(1).parm.at(0).val.data());
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(12, cs._cmd_buffer.at(1).parm.at(1).arg, "VALUE");
+  TEST_ASSERT_EQUAL_STRING("100", cs._cmd_buffer.at(1).parm.at(1).val.data());
+
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(4, cs._cmd_buffer.at(2).cmd, "KEY-STATE");
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(4, cs._cmd_buffer.at(2).parm.size(), "4 Parm");
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(4, cs._cmd_buffer.at(2).parm.at(0).arg, "DEVICEID");
+  TEST_ASSERT_EQUAL_STRING("1234", cs._cmd_buffer.at(2).parm.at(0).val.data());
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(7, cs._cmd_buffer.at(2).parm.at(1).arg, "KEY");
+  TEST_ASSERT_EQUAL_STRING("0", cs._cmd_buffer.at(2).parm.at(1).val.data());
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(11, cs._cmd_buffer.at(2).parm.at(2).arg, "TYPE");
+  TEST_ASSERT_EQUAL_STRING("PAGEUP", cs._cmd_buffer.at(2).parm.at(2).val.data());
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(9, cs._cmd_buffer.at(2).parm.at(3).arg, "PRESSED");
+  TEST_ASSERT_EQUAL_STRING("false", cs._cmd_buffer.at(2).parm.at(3).val.data());
+
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(4, cs._cmd_buffer.at(5).cmd, "KEY-STATE");
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(4, cs._cmd_buffer.at(5).parm.size(), "4 Parm");
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(4, cs._cmd_buffer.at(5).parm.at(0).arg, "DEVICEID");
+  TEST_ASSERT_EQUAL_STRING("1234", cs._cmd_buffer.at(5).parm.at(0).val.data());
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(7, cs._cmd_buffer.at(5).parm.at(1).arg, "KEY");
+  TEST_ASSERT_EQUAL_STRING("3", cs._cmd_buffer.at(5).parm.at(1).val.data());
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(11, cs._cmd_buffer.at(5).parm.at(2).arg, "TYPE");
+  TEST_ASSERT_EQUAL_STRING("BUTTON", cs._cmd_buffer.at(5).parm.at(2).val.data());
+  TEST_ASSERT_EQUAL_INT32_MESSAGE(9, cs._cmd_buffer.at(5).parm.at(3).arg, "PRESSED");
+  TEST_ASSERT_EQUAL_STRING("false", cs._cmd_buffer.at(5).parm.at(3).val.data());
+
+}
 
 int main(int argc, char **argv)
 {
@@ -242,6 +302,6 @@ int main(int argc, char **argv)
 
   RUN_TEST(test_Satellite_parseData_Good);
 
-  RUN_TEST(test_Satellite_addDevice);
+  RUN_TEST(test_Satellite_full_connect);
   UNITY_END();
 }
