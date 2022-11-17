@@ -1,6 +1,6 @@
 ## Companion Satellite
 
-A small libary to allow for connecting a microcontroller to [Bitfocus Companion](https://github.com/bitfocus/companion) over a network.
+A small libary to allow for connecting a microcontroller to [Bitfocus Companion](https://github.com/bitfocus/companion/wiki/Satellite-API) over a network.
 
 Companion 2.2.0 and newer are supported
 

@@ -6,6 +6,7 @@
 #include <iterator>
 #include <string>
 #include <vector>
+#include <chrono>
 
 CompanionSatellite::CompanionSatellite(std::string deviceId, std::string productName, int keysTotal, int keysPerRow, bool bitmaps, bool color, bool text)
 {
@@ -19,8 +20,6 @@ CompanionSatellite::CompanionSatellite(std::string deviceId, std::string product
 
     this->_keyUpCmd.append("KEY-PRESS DEVICEID=" + _deviceId + " PRESSED=0 KEY=");
     this->_keyDownCmd.append("KEY-PRESS DEVICEID=" + _deviceId + " PRESSED=1 KEY=");
-
-    DeviceDraw.resize(keysTotal);
 }
 
 CompanionSatellite::CompanionSatellite(const char *deviceId, const char *productName, int keysTotal, int keysPerRow, bool bitmaps, bool color, bool text)
@@ -35,8 +34,6 @@ CompanionSatellite::CompanionSatellite(const char *deviceId, const char *product
 
     this->_keyUpCmd.append("KEY-PRESS DEVICEID=" + _deviceId + " PRESSED=0 KEY=");
     this->_keyDownCmd.append("KEY-PRESS DEVICEID=" + _deviceId + " PRESSED=1 KEY=");
-
-    DeviceDraw.resize(keysTotal);
 }
 
 /**
@@ -139,9 +136,9 @@ CompanionSatellite::Parm_t CompanionSatellite::parseParameters(const char *data)
     }
 }
 
-int CompanionSatellite::parseData(const std::string data)
+int CompanionSatellite::parseData(const char *data)
 {
-    this->_cursor = data.data();
+    this->_cursor = data;
     int ret = 0;
     CMD_e cmd = parseCmdType(_cursor);
     while (cmd != CMD_e::CMD_NONE)
@@ -178,4 +175,61 @@ void CompanionSatellite::addDevice()
         " BITMAPS=" + ((this->_props.bitmaps) ? "1" : "0") +
         " COLORS=" + ((this->_props.color) ? "1" : "0") +
         " TEXT=" + ((this->_props.text) ? "1" : "0") + "\n");
+}
+
+/**
+ * Craft ping message.
+ * @param
+ * @return
+ */
+void CompanionSatellite::ping()
+{
+    this->transmitBuffer.append(
+        "PING 1234");
+}
+
+/**
+ * Starts and maintains the connection to Companion.
+ * @param data from the establishd tcp connection
+ * @return
+ */
+int CompanionSatellite::maintainConnection(const std::string data, unsigned long elapsedTime)
+{
+    if (data.length() < 4)
+        return -1;
+
+    if (this->parseData(data.data()))
+    {
+        switch (this->_state)
+        {
+        case CON_e::DISCONNECTED:
+            if (this->_cmd_buffer.at(0).cmd != CMD_e::BEGIN)
+                return 0;
+
+            for (auto &it : this->_cmd_buffer.at(0).parm)
+            {
+                if (it.arg == ARG_e::AV)
+                {
+                    std::string::size_type idx;
+                    int major = std::stoi(it.val, &idx);
+                    int minor = std::stoi(it.val.substr(idx+1), &idx);
+                    //FIXME: gets minor???
+                    // int patch = std::stoi(it.val.substr(idx+1), &idx);
+                    if (major == 1 && minor >= 2) {
+                        _state = CON_e::CONNECTED;
+                        return 1;
+                    } else {
+                        return 0;
+                    }
+                }
+            }
+
+            break;
+
+        default:
+            break;
+        }
+    }
+
+    return 0;
 }
