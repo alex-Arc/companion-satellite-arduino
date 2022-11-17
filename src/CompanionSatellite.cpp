@@ -5,7 +5,7 @@
 #include <cstring>
 #include <iterator>
 #include <string>
-#include <vector>
+#include <queue>
 #include <chrono>
 
 CompanionSatellite::CompanionSatellite(std::string deviceId, std::string productName, int keysTotal, int keysPerRow, bool bitmaps, bool color, bool text)
@@ -138,6 +138,9 @@ CompanionSatellite::Parm_t CompanionSatellite::parseParameters(const char *data)
 
 int CompanionSatellite::parseData(const char *data)
 {
+    if (!data)
+        return -1;
+
     this->_cursor = data;
     int ret = 0;
     CMD_e cmd = parseCmdType(_cursor);
@@ -147,11 +150,11 @@ int CompanionSatellite::parseData(const char *data)
         Parm_t parm = parseParameters(_cursor);
         while (parm.arg != ARG_e::ARG_NONE)
         {
-            command.parm.push_back(std::move(parm));
+            command.parm.push(std::move(parm));
             parm = parseParameters(_cursor);
         }
 
-        this->_cmd_buffer.push_back(std::move(command));
+        this->_cmd_buffer.push(std::move(command));
         ret++;
 
         cmd = parseCmdType(_cursor);
@@ -193,42 +196,69 @@ void CompanionSatellite::ping()
  * @param data from the establishd tcp connection
  * @return
  */
-int CompanionSatellite::maintainConnection(const std::string data, unsigned long elapsedTime)
+int CompanionSatellite::maintainConnection(unsigned long elapsedTime, const char *data)
 {
-    if (data.length() < 4)
-        return -1;
+    this->parseData(data);
 
-    if (this->parseData(data.data()))
+    while (!this->_cmd_buffer.empty())
     {
-        switch (this->_state)
+        auto c = &this->_cmd_buffer.front();
+        switch (this->state)
         {
+        case CON_e::RECONNECT:
         case CON_e::DISCONNECTED:
-            if (this->_cmd_buffer.at(0).cmd != CMD_e::BEGIN)
-                return 0;
-
-            for (auto &it : this->_cmd_buffer.at(0).parm)
+            if (c->cmd != CMD_e::BEGIN)
             {
-                if (it.arg == ARG_e::AV)
+                this->state = CON_e::RECONNECT;
+                this->transmitBuffer.clear();
+            }
+            else
+            {
+                while (!c->parm.empty())
                 {
-                    std::string::size_type idx;
-                    int major = std::stoi(it.val, &idx);
-                    int minor = std::stoi(it.val.substr(idx+1), &idx);
-                    //FIXME: gets minor???
-                    // int patch = std::stoi(it.val.substr(idx+1), &idx);
-                    if (major == 1 && minor >= 2) {
-                        _state = CON_e::CONNECTED;
-                        return 1;
-                    } else {
-                        return 0;
+                    auto p = &c->parm.front();
+                    if (p->arg == ARG_e::AV)
+                    {
+                        std::string::size_type idx;
+                        int major = std::stoi(p->val, &idx);
+                        int minor = std::stoi(p->val.substr(idx + 1), &idx);
+                        // FIXME: gets minor???
+                        //  int patch = std::stoi(p.val.substr(idx+1), &idx);
+                        if (major == 1 && minor >= 2)
+                            this->state = CON_e::CONNECTED;
                     }
+                    c->parm.pop();
                 }
             }
-
+            this->_cmd_buffer.pop();
             break;
-
-        default:
+        case CON_e::CONNECTED:
+        case CON_e::ACTIVE:
+        case CON_e::PENDINGADD:
+            this->timeout += elapsedTime;
             break;
         }
+    }
+
+    switch (this->state)
+    {
+    case CON_e::CONNECTED:
+        this->addDevice();
+        this->state = CON_e::PENDINGADD;
+        this->timeout = 0;
+        break;
+    case CON_e::ACTIVE:
+    case CON_e::PENDINGADD:
+        this->timeout += elapsedTime;
+        break;
+    case CON_e::RECONNECT:
+    case CON_e::DISCONNECTED:
+        break;
+    }
+
+    if (this->timeout > 2000)
+    {
+        this->state = CON_e::RECONNECT;
     }
 
     return 0;
