@@ -1,5 +1,6 @@
 #include "Satellite.hpp"
 #include "SatelliteStateDisconnected.hpp"
+#include "SatelliteStatePending.hpp"
 
 #include <algorithm>
 #include <cstring>
@@ -19,6 +20,18 @@ Satellite::Satellite(std::string deviceId, std::string productName, int keysTota
     this->settings.bitmaps = bitmaps;
     this->settings.color = color;
     this->settings.text = text;
+}
+
+/**
+ * Transition to a new state.
+ *
+ * @param s string ptr to search.
+ */
+void Satellite::setState(api::SatelliteState &newState)
+{
+    this->currentState->exit(this);
+    currentState = &newState;
+    this->currentState->enter(this);
 }
 
 /**
@@ -161,5 +174,19 @@ int Satellite::parseData(const char *data)
 int Satellite::maintainConnection(unsigned long elapsedTime, const char *data)
 {
     this->parseData(data);
+    while (!this->cmd_buffer.empty())
+    {
+        switch (this->cmd_buffer.front().cmd)
+        {
+        case api::CMD::BEGIN:
+            currentState->begin(this);
+            break;
+        
+        default:
+            break;
+        }
+
+
+    }
     return this->cmd_buffer.size();
 }

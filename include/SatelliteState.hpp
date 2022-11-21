@@ -10,6 +10,7 @@ class Satellite;
 
 namespace CompanionSatelliteAPI
 {
+    class Disconnected;
 
     class SatelliteState
     {
@@ -19,8 +20,8 @@ namespace CompanionSatelliteAPI
         virtual void enter(Satellite *sat) = 0;
         virtual void exit(Satellite *sat) = 0;
 
-        bool isConnected() { return false; };
-        bool isActive() { return false; };
+        virtual bool isConnected() { return false; };
+        virtual bool isActive() { return false; };
 
         virtual void addDevice() {}
         virtual void begin(Satellite *sat) {}

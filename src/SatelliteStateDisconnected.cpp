@@ -11,7 +11,6 @@ namespace CompanionSatelliteAPI
     void Disconnected::begin(Satellite *sat)
     {
         sat->txBuffer.append(
-
             "ADD-DEVICE DEVICEID=" + sat->settings.id +
             " PRODUCT_NAME=\"" + sat->settings.name +
             "\" KEYS_TOTAL=" + std::to_string(sat->settings.keysTotal) +
@@ -19,6 +18,9 @@ namespace CompanionSatelliteAPI
             " BITMAPS=" + ((sat->settings.bitmaps) ? "1" : "0") +
             " COLORS=" + ((sat->settings.color) ? "1" : "0") +
             " TEXT=" + ((sat->settings.text) ? "1" : "0") + "\n");
+
+        sat->cmd_buffer.pop();
+        sat->setState(Pending::getInstance());
     }
 
 } // namespace CompanionSatelliteAPI

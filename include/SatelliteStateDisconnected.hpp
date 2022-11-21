@@ -21,8 +21,6 @@ namespace CompanionSatelliteAPI
         void enter(Satellite *sat) {}
         void exit(Satellite *sat) {}
 
-        bool isConnected() { return false; };
-        bool isActive() { return false; };
 
         void begin(Satellite *sat) override;
 

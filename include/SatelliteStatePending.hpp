@@ -6,10 +6,9 @@
 #include <string>
 #include <queue>
 
-class Satellite;
-
 namespace CompanionSatelliteAPI
 {
+
     class Pending : public SatelliteState
     {
     private:
@@ -21,10 +20,9 @@ namespace CompanionSatelliteAPI
         void enter(Satellite *sat) {}
         void exit(Satellite *sat) {}
 
-        bool isConnected() { return false; };
-        bool isActive() { return false; };
+        bool isConnected() override { return true; };
 
-        void begin(Satellite *sat) override;
+        // void begin(Satellite *sat) override;
 
         static Pending &getInstance()
         {

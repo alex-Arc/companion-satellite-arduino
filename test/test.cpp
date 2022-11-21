@@ -37,14 +37,15 @@ void test_maintainConnection_beginOK()
 {
     Satellite cs("1234", "Test", 4, 2);
 
-    TEST_ASSERT_FALSE_MESSAGE(cs.isConnected(), "is connected");
     TEST_ASSERT_FALSE_MESSAGE(cs.isActive(), "is not active");
+    TEST_ASSERT_FALSE_MESSAGE(cs.isConnected(), "is not connected");
 
     std::string input = "BEGIN CompanionVersion=8.3.1+4641-v2-3.1-dc01ac7c ApiVersion=1.2.4\n";
     int ret = cs.maintainConnection(0, input.data());
-    TEST_ASSERT_EQUAL_INT32(1, ret);
-    TEST_ASSERT_TRUE_MESSAGE(cs.isConnected(), "is connected");
+    ret = cs.maintainConnection(0);
+
     TEST_ASSERT_FALSE_MESSAGE(cs.isActive(), "is not active");
+    TEST_ASSERT_TRUE_MESSAGE(cs.isConnected(), "is connected");
 }
 
 void test_maintainConnection_noData()
