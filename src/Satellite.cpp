@@ -171,22 +171,66 @@ int Satellite::parseData(const char *data)
  * @param data from the establishd tcp connection
  * @return
  */
-int Satellite::maintainConnection(unsigned long elapsedTime, const char *data)
+int Satellite::maintainConnection(uint32_t elapsedTime, const char *data)
 {
     this->parseData(data);
-    while (!this->cmd_buffer.empty())
+
+    if (this->cmd_buffer.empty())
     {
-        switch (this->cmd_buffer.front().cmd)
-        {
-        case api::CMD::BEGIN:
-            currentState->begin(this);
-            break;
-        
-        default:
-            break;
-        }
-
-
+        this->keepActive(elapsedTime);
     }
-    return this->cmd_buffer.size();
+    else
+    {
+        this->timeout = 0;
+        while (!this->cmd_buffer.empty())
+        {
+            switch (this->cmd_buffer.front().cmd)
+            {
+            case api::CMD::BEGIN:
+                currentState->begin(this);
+                break;
+
+            case api::CMD::ADDDEVICE:
+                currentState->addDevice(this);
+                break;
+
+            case api::CMD::PONG:
+                this->ping_pending = false;
+                break;
+
+            default:
+                break;
+            }
+        }
+    }
+    return 0;
+}
+
+int Satellite::keepActive(uint32_t elapsedTime)
+{
+    timeout += elapsedTime;
+
+    if (this->isActive())
+    {
+        if (ping_pending && timeout > ping_timeout)
+        {
+            this->setState(api::Disconnected::getInstance());
+            return -1;
+        }
+        else if (!ping_pending && timeout > ping_time)
+        {
+            this->sendPing();
+            return 1;
+        }
+    }
+    else
+    {
+        if (timeout > ping_time)
+        {
+            this->setState(api::Disconnected::getInstance());
+            return -1;
+        }
+    }
+
+    return 0;
 }

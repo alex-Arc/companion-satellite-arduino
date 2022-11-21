@@ -10,30 +10,32 @@ class Satellite;
 
 namespace CompanionSatelliteAPI
 {
-    class Disconnected;
 
     class SatelliteState
     {
     private:
-        /* data */
     public:
+        SatelliteState() {}
+        SatelliteState(const SatelliteState &other);
+        SatelliteState &operator=(const SatelliteState &other);
+
         virtual void enter(Satellite *sat) = 0;
         virtual void exit(Satellite *sat) = 0;
 
         virtual bool isConnected() { return false; };
         virtual bool isActive() { return false; };
-        virtual std::string getStateName() { return std::string("virtual"); };
+        virtual const std::string getStateName() { return std::string("virtual"); };
 
-        virtual void addDevice() {}
-        virtual void begin(Satellite *sat) {}
-        virtual void brightness() {}
-        virtual void keyPress() {}
-        virtual void keystate() {}
-        virtual void keysClear() {}
-        virtual void ping() {}
-        virtual void pong() {}
-        virtual void removedevice() {}
-        virtual void rotate() {}
+        virtual void addDevice(Satellite *sat) { this->removeDevice(sat); }
+        virtual void begin(Satellite *sat) { this->removeDevice(sat); }
+        virtual void brightness(Satellite *sat) { this->removeDevice(sat); }
+        virtual void keyPress(Satellite *sat) { this->removeDevice(sat); }
+        virtual void keysClear(Satellite *sat) { this->removeDevice(sat); }
+        virtual void keystate(Satellite *sat) { this->removeDevice(sat); }
+        // virtual void ping(Satellite *sat) { this->removeDevice(sat); }
+        // virtual void pong(Satellite *sat) { this->removeDevice(sat); }
+        virtual void removeDevice(Satellite *sat);
+        virtual void rotate(Satellite *sat) { this->removeDevice(sat); }
     };
 
     enum CMD

@@ -21,10 +21,10 @@ namespace CompanionSatelliteAPI
         void exit(Satellite *sat) {}
 
         bool isConnected() override { return true; };
-        virtual std::string getStateName() { return std::string("Pending"); };
+        std::string const getStateName() override { return std::string("Pending"); };
 
 
-        // void begin(Satellite *sat) override;
+        void begin(Satellite *sat) override;
 
         static Pending &getInstance()
         {

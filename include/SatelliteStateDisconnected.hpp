@@ -18,10 +18,10 @@ namespace CompanionSatelliteAPI
         Disconnected &operator=(const Disconnected &other);
 
     public:
-        void enter(Satellite *sat) {}
+        void enter(Satellite *sat) override;
         void exit(Satellite *sat) {}
 
-        virtual std::string getStateName() { return std::string("Disconnected"); };
+        std::string const getStateName() override { return std::string("Disconnected"); };
 
         void begin(Satellite *sat) override;
 

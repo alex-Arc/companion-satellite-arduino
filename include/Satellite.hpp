@@ -29,7 +29,15 @@ private:
     api::CMD parseCmdType(const char *data);
     api::parm_t parseParameters(const char *data);
 
+    void sendPing() {ping_pending = true;}
+    int keepActive(uint32_t elapsedTime);
+
     std::queue<api::cmd_t> cmd_buffer;
+
+    uint32_t timeout = 0;
+    const uint32_t ping_time = 1000;
+    const uint32_t ping_timeout = 50;
+    bool ping_pending = false;
 
     friend class api::SatelliteState;
     friend class api::Disconnected;
@@ -43,7 +51,7 @@ public:
     std::string getState() {return currentState->getStateName();}
 
     int parseData(const char *data);
-    int maintainConnection(unsigned long elapsedTime, const char *data = nullptr);
+    int maintainConnection(uint32_t elapsedTime, const char *data = nullptr);
 
     Satellite(std::string deviceId, std::string productName, int keysTotal, int keysPerRow, bool bitmaps = false, bool color = false, bool text = false);
 };

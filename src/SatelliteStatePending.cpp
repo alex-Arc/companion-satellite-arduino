@@ -6,9 +6,9 @@
 
 namespace CompanionSatelliteAPI
 {
-    // void Pending::begin(Satellite *sat)
-    // {
-    //     sat->setState(Disconnected::getInstance());
-    // }
+    void Pending::begin(Satellite *sat)
+    {
+        sat->setState(Disconnected::getInstance());
+    }
 
 } // namespace CompanionSatelliteAPI
