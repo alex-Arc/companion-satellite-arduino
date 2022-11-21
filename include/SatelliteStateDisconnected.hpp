@@ -21,6 +21,7 @@ namespace CompanionSatelliteAPI
         void enter(Satellite *sat) {}
         void exit(Satellite *sat) {}
 
+        virtual std::string getStateName() { return std::string("Disconnected"); };
 
         void begin(Satellite *sat) override;
 

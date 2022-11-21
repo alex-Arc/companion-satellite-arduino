@@ -40,9 +40,13 @@ void test_maintainConnection_beginOK()
     TEST_ASSERT_FALSE_MESSAGE(cs.isActive(), "is not active");
     TEST_ASSERT_FALSE_MESSAGE(cs.isConnected(), "is not connected");
 
+    TEST_ASSERT_EQUAL_STRING("Disconnected", cs.getState().data());
+
     std::string input = "BEGIN CompanionVersion=8.3.1+4641-v2-3.1-dc01ac7c ApiVersion=1.2.4\n";
     int ret = cs.maintainConnection(0, input.data());
     ret = cs.maintainConnection(0);
+
+    TEST_ASSERT_EQUAL_STRING("Pending", cs.getState().data());
 
     TEST_ASSERT_FALSE_MESSAGE(cs.isActive(), "is not active");
     TEST_ASSERT_TRUE_MESSAGE(cs.isConnected(), "is connected");

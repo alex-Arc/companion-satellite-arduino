@@ -40,6 +40,7 @@ public:
 
     bool isConnected() { return currentState->isConnected(); };
     bool isActive() { return currentState->isActive(); };
+    std::string getState() {return currentState->getStateName();}
 
     int parseData(const char *data);
     int maintainConnection(unsigned long elapsedTime, const char *data = nullptr);

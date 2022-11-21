@@ -22,6 +22,7 @@ namespace CompanionSatelliteAPI
 
         virtual bool isConnected() { return false; };
         virtual bool isActive() { return false; };
+        virtual std::string getStateName() { return std::string("virtual"); };
 
         virtual void addDevice() {}
         virtual void begin(Satellite *sat) {}
