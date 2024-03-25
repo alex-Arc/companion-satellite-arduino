@@ -1,4 +1,4 @@
-// #include <Arduino.h>
+#include <Arduino.h>
 #include <CompanionSatellite.h>
 
 #include <algorithm>
@@ -6,7 +6,7 @@
 #include <iterator>
 #include <string>
 #include <queue>
-#include <chrono>
+// #include <chrono>
 
 CompanionSatellite::CompanionSatellite(std::string deviceId, std::string productName, int keysTotal, int keysPerRow, bool bitmaps, bool color, bool text)
 {
@@ -17,6 +17,8 @@ CompanionSatellite::CompanionSatellite(std::string deviceId, std::string product
     this->_props.bitmaps = bitmaps;
     this->_props.color = color;
     this->_props.text = text;
+
+    this->keyState.resize(keysTotal);
 
     this->_keyUpCmd.append("KEY-PRESS DEVICEID=" + _deviceId + " PRESSED=0 KEY=");
     this->_keyDownCmd.append("KEY-PRESS DEVICEID=" + _deviceId + " PRESSED=1 KEY=");
@@ -31,6 +33,8 @@ CompanionSatellite::CompanionSatellite(const char *deviceId, const char *product
     this->_props.bitmaps = bitmaps;
     this->_props.color = color;
     this->_props.text = text;
+
+    this->keyState.resize(keysTotal);
 
     this->_keyUpCmd.append("KEY-PRESS DEVICEID=" + _deviceId + " PRESSED=0 KEY=");
     this->_keyDownCmd.append("KEY-PRESS DEVICEID=" + _deviceId + " PRESSED=1 KEY=");
@@ -185,10 +189,15 @@ void CompanionSatellite::addDevice()
  * @param
  * @return
  */
-void CompanionSatellite::ping()
+void CompanionSatellite::keepAlive(unsigned long timeDiff)
 {
-    this->transmitBuffer.append(
-        "PING 1234");
+    this->pingTimeout += timeDiff;
+    if (this->pingTimeout > 2100)
+    {
+        printf("Sending PING\n");
+        this->transmitBuffer.append("PING 1234\n");
+        this->pingTimeout = 0;
+    }
 }
 
 /**
@@ -196,9 +205,11 @@ void CompanionSatellite::ping()
  * @param data from the establishd tcp connection
  * @return
  */
-int CompanionSatellite::maintainConnection(unsigned long elapsedTime, const char *data)
+int CompanionSatellite::maintainConnection(const char *data)
 {
     this->parseData(data);
+
+    const unsigned long diff = millis() - lastmaintain;
 
     while (!this->_cmd_buffer.empty())
     {
@@ -211,6 +222,8 @@ int CompanionSatellite::maintainConnection(unsigned long elapsedTime, const char
             {
                 this->state = CON_e::RECONNECT;
                 this->transmitBuffer.clear();
+                this->timeout = 0;
+                this->pingTimeout = 0;
             }
             else
             {
@@ -222,44 +235,152 @@ int CompanionSatellite::maintainConnection(unsigned long elapsedTime, const char
                         std::string::size_type idx;
                         int major = std::stoi(p->val, &idx);
                         int minor = std::stoi(p->val.substr(idx + 1), &idx);
-                        // FIXME: gets minor???
-                        //  int patch = std::stoi(p.val.substr(idx+1), &idx);
-                        if (major == 1 && minor >= 2)
-                            this->state = CON_e::CONNECTED;
+                        int patch = std::stoi(p->val.substr(idx + 1), &idx);
+                        // FIXME: is this correct
+                        printf("Connected to satellite version: %d %d %d\n", major, minor, patch);
+                        this->state = CON_e::CONNECTED;
+                        this->timeout = 0;
+                        this->pingTimeout = 0;
                     }
                     c->parm.pop();
                 }
             }
-            this->_cmd_buffer.pop();
             break;
         case CON_e::CONNECTED:
+            break;
         case CON_e::ACTIVE:
+            switch (c->cmd)
+            {
+            case CMD_e::PONG:
+                printf("PONG\n");
+                this->timeout = 0;
+                break;
+            case CMD_e::BRIGHTNESS:
+            {
+                printf("BRIGHTNESS\n");
+                break;
+            }
+            case CMD_e::KEYPRESS:
+            {
+                int index = -1;
+                bool press = false;
+                while (!c->parm.empty())
+                {
+                    auto p = &c->parm.front();
+                    switch (p->arg)
+                    {
+                    case ARG_e::KEY:
+                        index = std::stoi(p->val);
+                        break;
+
+                    case ARG_e::PRESSED:
+                        press = (p->val == "t");
+                        break;
+                    }
+                    c->parm.pop();
+                }
+                if (index > -1)
+                {
+                    this->keyState[index].pressed = press;
+                    this->update = true;
+                }
+                break;
+            }
+            case CMD_e::KEYSTATE:
+            {
+                int index = -1;
+                std::string color;
+                std::string text;
+                while (!c->parm.empty())
+                {
+                    auto p = &c->parm.front();
+                    switch (p->arg)
+                    {
+                    case ARG_e::KEY:
+                        index = std::stoi(p->val);
+                        break;
+
+                    case ARG_e::TYPE:
+                        // TODO:
+                        break;
+
+                    case ARG_e::BITMAP:
+                        // TODO:
+                        break;
+
+                    case ARG_e::COLOR:
+                        color = p->val;
+                        break;
+
+                    case ARG_e::TEXT:
+                        text = p->val;
+                        break;
+                    }
+                    c->parm.pop();
+                }
+                if (index > -1)
+                {
+                    this->keyState[index].color = color;
+                    this->keyState[index].text = text;
+                    this->update = true;
+                }
+                break;
+            }
+            break;
+            }
         case CON_e::PENDINGADD:
-            this->timeout += elapsedTime;
+            if (c->cmd != CMD_e::ADDDEVICE)
+            {
+                this->state = CON_e::RECONNECT;
+                this->transmitBuffer.clear();
+            }
+            else
+            {
+                auto p = &c->parm.front();
+                if (c->cmd == CMD_e::ADDDEVICE && p->arg == ARG_e::OK)
+                {
+                    printf("device add OK\n");
+                    this->state = CON_e::ACTIVE;
+                }
+                else
+                {
+                    printf("device add Fail\n");
+                    this->state = CON_e::RECONNECT;
+                    this->transmitBuffer.clear();
+                }
+                c->parm.pop();
+            }
             break;
         }
+        this->_cmd_buffer.pop();
     }
 
     switch (this->state)
     {
     case CON_e::CONNECTED:
         this->addDevice();
+        printf("pending add\n");
         this->state = CON_e::PENDINGADD;
         this->timeout = 0;
         break;
     case CON_e::ACTIVE:
+        this->keepAlive(diff);
+        this->timeout += diff;
+        break;
     case CON_e::PENDINGADD:
-        this->timeout += elapsedTime;
+        this->timeout += diff;
         break;
     case CON_e::RECONNECT:
     case CON_e::DISCONNECTED:
         break;
     }
 
-    if (this->timeout > 2000)
+    if (this->timeout > 4000)
     {
         this->state = CON_e::RECONNECT;
+        printf("timeout\n");
     }
 
+    lastmaintain = millis();
     return 0;
 }

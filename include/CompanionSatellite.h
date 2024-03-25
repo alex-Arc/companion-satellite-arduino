@@ -1,9 +1,10 @@
 #ifndef CompanionSatellite_h
 #define CompanionSatellite_h
 
-// #include <Arduino.h>
+#include <Arduino.h>
 #include <string>
 #include <queue>
+#include <vector>
 // #include <algorithm>
 
 // #include <queue> // std::queue, std::swap(queue)
@@ -71,7 +72,7 @@ private:
         PRESSED,
         TEXT,
         TYPE,
-        VALUE
+        VALUE,
     };
 
     const std::vector<std::string> arg_list = {
@@ -87,7 +88,8 @@ private:
         "PRESSED",
         "TEXT",
         "TYPE",
-        "VALUE"};
+        "VALUE",
+    };
 
     enum CON_e
     {
@@ -115,10 +117,26 @@ private:
         std::queue<Parm_t> parm;
     } typedef cmd_t;
 
+    struct
+    {
+        std::string image;
+        std::string color;
+        std::string text;
+        bool pressed;
+    } typedef keyStateProps_t;
+
     CMD_e parseCmdType(const char *data);
     Parm_t parseParameters(const char *data);
 
     unsigned long timeout = 0;
+    unsigned long pingTimeout = 0;
+    unsigned long lastmaintain = millis();
+
+    std::queue<cmd_t> _cmd_buffer;
+    const char *_cursor = nullptr;
+    int parseData(const char *data);
+    void addDevice();
+    void keepAlive(unsigned long timeDiff);
 
 public:
     CompanionSatellite(std::string deviceId, std::string productName, int keysTotal, int keysPerRow, bool bitmaps = false, bool color = false, bool text = false);
@@ -129,17 +147,14 @@ public:
     void keyDown(int keyIndex);
     void keyUp(int keyIndex);
 
-    const char *_cursor = nullptr;
-    std::queue<cmd_t> _cmd_buffer;
+    std::vector<keyStateProps_t> keyState;
+
+    bool update = false;
 
     bool isConnected() { return state >= CON_e::CONNECTED; };
     bool isActive() { return state >= CON_e::ACTIVE; };
 
-    int parseData(const char *data);
-
-    int maintainConnection(unsigned long elapsedTime, const char *data = nullptr);
+    int maintainConnection(const char *data = nullptr);
     int disconnect();
-    void addDevice();
-    void ping();
 };
 #endif
