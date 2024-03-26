@@ -5,12 +5,6 @@
 #include <string>
 #include <queue>
 #include <vector>
-// #include <algorithm>
-
-// #include <queue> // std::queue, std::swap(queue)
-
-// #include <utility>
-
 #include <B64.h>
 
 class CompanionSatellite

@@ -1,12 +1,9 @@
 #include <Arduino.h>
 #include <CompanionSatellite.h>
 
-#include <algorithm>
 #include <cstring>
-#include <iterator>
 #include <string>
 #include <queue>
-// #include <chrono>
 
 CompanionSatellite::CompanionSatellite(std::string deviceId, std::string productName, int keysTotal, int keysPerRow, bool bitmaps, bool color, bool text)
 {
@@ -40,6 +37,22 @@ CompanionSatellite::CompanionSatellite(const char *deviceId, const char *product
     this->_keyDownCmd.append("KEY-PRESS DEVICEID=" + _deviceId + " PRESSED=1 KEY=");
 }
 
+void CompanionSatellite::keyDown(int keyIndex)
+{
+    if (this->state == CON_e::ACTIVE)
+        this->transmitBuffer.append(this->_keyDownCmd + std::to_string(keyIndex) + '\n');
+
+    printf("%s\n", this->transmitBuffer.c_str());
+}
+
+void CompanionSatellite::keyUp(int keyIndex)
+{
+    if (this->state == CON_e::ACTIVE)
+        this->transmitBuffer.append(this->_keyUpCmd + std::to_string(keyIndex) + '\n');
+
+    printf("%s\n", this->transmitBuffer.c_str());
+}
+
 /**
  * Find the matching command.
  *
@@ -50,19 +63,16 @@ CompanionSatellite::CompanionSatellite(const char *deviceId, const char *product
  */
 CompanionSatellite::CMD_e CompanionSatellite::parseCmdType()
 {
-    auto start = micros();
     if (*this->cursor == '\0')
     {
         return CompanionSatellite::CMD_e::CMD_NONE;
     }
 
     const char *token = strtok_r(this->cursor, " ", &this->cursor);
-    // printf("%s\n", token);
     for (unsigned int i = 0; i < this->cmd_list.size(); i++)
     {
         if (strcmp(token, this->cmd_list[i].c_str()) == 0)
         {
-            // printf("%s\n", token);
             return CompanionSatellite::CMD_e(i);
         }
     }
@@ -76,8 +86,6 @@ CompanionSatellite::CMD_e CompanionSatellite::parseCmdType()
  */
 CompanionSatellite::Parm_t CompanionSatellite::parseParameters()
 {
-    auto start = micros();
-
     if (*this->cursor == '\0')
     {
         return Parm_t{.arg = ARG_e::ARG_NONE, .val = "none"};
@@ -129,14 +137,10 @@ int CompanionSatellite::parseData()
     if (this->cursor == nullptr || *this->cursor == '\0')
         return -1;
 
-    // printf("'%s'\n", this->cursor);
-
     int ret = 0;
     CMD_e cmd = parseCmdType();
     while (cmd != CMD_e::CMD_NONE)
     {
-        // printf("'%s'\n", this->cursor);
-
         cmd_t command = {.cmd = cmd};
         Parm_t parm = parseParameters();
         while (parm.arg != ARG_e::ARG_NONE)
@@ -382,8 +386,10 @@ int CompanionSatellite::maintainConnection(char *data)
 
     if (this->timeout > 4000)
     {
+        if (this->state > CON_e::DISCONNECTED)
+            printf("timeout\n");
+
         this->state = CON_e::RECONNECT;
-        printf("timeout\n");
     }
 
     lastmaintain = millis();
