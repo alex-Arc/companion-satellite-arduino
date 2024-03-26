@@ -95,7 +95,7 @@ CompanionSatellite::Parm_t CompanionSatellite::parseParameters()
             case ' ':
             case '\n':
                 ++this->cursor;
-                return Parm_t{.arg = CompanionSatellite::ARG_e(i), .val = "t"};
+                return Parm_t{.arg = CompanionSatellite::ARG_e(i), .val = "true"};
             case '=':
             {
                 this->cursor++;
@@ -189,33 +189,33 @@ void CompanionSatellite::keepAlive(unsigned long timeDiff)
 }
 void CompanionSatellite::handleStartConnection(CompanionSatellite::cmd_t *c)
 {
-if (c->cmd != CMD_e::BEGIN)
+    if (c->cmd != CMD_e::BEGIN)
+    {
+        this->state = CON_e::RECONNECT;
+        this->transmitBuffer.clear();
+        this->timeout = 0;
+        this->pingTimeout = 0;
+    }
+    else
+    {
+        while (!c->parm.empty())
+        {
+            auto p = &c->parm.front();
+            if (p->arg == ARG_e::AV)
             {
-                this->state = CON_e::RECONNECT;
-                this->transmitBuffer.clear();
+                std::string::size_type idx;
+                int major = std::stoi(p->val, &idx);
+                int minor = std::stoi(p->val.substr(idx + 1), &idx);
+                int patch = std::stoi(p->val.substr(idx + 1), &idx);
+                // FIXME: is this correct
+                printf("Connected to satellite version: %d %d %d\n", major, minor, patch);
+                this->state = CON_e::CONNECTED;
                 this->timeout = 0;
                 this->pingTimeout = 0;
             }
-            else
-            {
-                while (!c->parm.empty())
-                {
-                    auto p = &c->parm.front();
-                    if (p->arg == ARG_e::AV)
-                    {
-                        std::string::size_type idx;
-                        int major = std::stoi(p->val, &idx);
-                        int minor = std::stoi(p->val.substr(idx + 1), &idx);
-                        int patch = std::stoi(p->val.substr(idx + 1), &idx);
-                        // FIXME: is this correct
-                        printf("Connected to satellite version: %d %d %d\n", major, minor, patch);
-                        this->state = CON_e::CONNECTED;
-                        this->timeout = 0;
-                        this->pingTimeout = 0;
-                    }
-                    c->parm.pop();
-                }
-            }
+            c->parm.pop();
+        }
+    }
 }
 
 void CompanionSatellite::handleActiveConnection(CompanionSatellite::cmd_t *c)
@@ -262,6 +262,7 @@ void CompanionSatellite::handleActiveConnection(CompanionSatellite::cmd_t *c)
         int index = -1;
         std::string color;
         std::string text;
+        bool press = false;
         while (!c->parm.empty())
         {
             auto p = &c->parm.front();
@@ -286,6 +287,10 @@ void CompanionSatellite::handleActiveConnection(CompanionSatellite::cmd_t *c)
             case ARG_e::TEXT:
                 text = B64::decode(p->val);
                 break;
+
+            case ARG_e::PRESSED:
+                press = (p->val == "true");
+                break;
             }
             c->parm.pop();
         }
@@ -293,6 +298,7 @@ void CompanionSatellite::handleActiveConnection(CompanionSatellite::cmd_t *c)
         {
             this->keyState[index].color = color;
             this->keyState[index].text = text;
+            this->keyState[index].pressed = press;
             this->update = true;
         }
         break;
