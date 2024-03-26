@@ -48,24 +48,25 @@ CompanionSatellite::CompanionSatellite(const char *deviceId, const char *product
  * @param data string ptr to search.
  * @return CMD_e enum.
  */
-CompanionSatellite::CMD_e CompanionSatellite::parseCmdType(const char *data)
+CompanionSatellite::CMD_e CompanionSatellite::parseCmdType()
 {
-    while (*data == ' ' || *data == '\n')
-        ++data;
-
-    auto cmd = std::lower_bound(cmd_list.begin(), cmd_list.end(), data,
-                                [](std::string from_list, const char *from_data)
-                                { return (from_list.compare(0, std::string::npos, from_data, 0, from_list.size()) < 0); });
-
-    if (cmd != cmd_list.end() && cmd->compare(0, std::string::npos, data, 0, cmd->size()) == 0)
-    {
-        this->_cursor = data + cmd->size();
-        return (CompanionSatellite::CMD_e)std::distance(cmd_list.begin(), cmd);
-    }
-    else
+    auto start = micros();
+    if (*this->cursor == '\0')
     {
         return CompanionSatellite::CMD_e::CMD_NONE;
     }
+
+    const char *token = strtok_r(this->cursor, " ", &this->cursor);
+    // printf("%s\n", token);
+    for (unsigned int i = 0; i < this->cmd_list.size(); i++)
+    {
+        if (strcmp(token, this->cmd_list[i].c_str()) == 0)
+        {
+            // printf("%s\n", token);
+            return CompanionSatellite::CMD_e(i);
+        }
+    }
+    return CompanionSatellite::CMD_e::CMD_NONE;
 }
 
 /**
@@ -73,97 +74,84 @@ CompanionSatellite::CMD_e CompanionSatellite::parseCmdType(const char *data)
  * @param data string ptr to search.
  * @return Parm_t.
  */
-CompanionSatellite::Parm_t CompanionSatellite::parseParameters(const char *data)
+CompanionSatellite::Parm_t CompanionSatellite::parseParameters()
 {
-    while (*data == ' ' || *data == '\n')
-        ++data;
+    auto start = micros();
 
-    auto arg = std::lower_bound(arg_list.begin(), arg_list.end(), data,
-                                [](std::string from_list, const char *from_data)
-                                { return (from_list.compare(0, std::string::npos, from_data, 0, from_list.size()) < 0); });
-
-    if (arg != arg_list.end() && arg->compare(0, std::string::npos, data, 0, arg->size()) == 0)
+    if (*this->cursor == '\0')
     {
-        switch (data[arg->size()])
+        return Parm_t{.arg = ARG_e::ARG_NONE, .val = "none"};
+    }
+
+    auto breakPoint = std::strcspn(this->cursor, " \n=");
+
+    for (unsigned int i = 0; i < this->arg_list.size(); i++)
+    {
+        if (strncmp(this->cursor, this->arg_list[i].c_str(), breakPoint) == 0)
         {
-        case '\n':
-        case ' ':
-        {
-            this->_cursor = data + arg->size() + 1;
-            return Parm_t{
-                .arg = (ARG_e)std::distance(arg_list.begin(), arg),
-                .val = "t"};
-        }
-        break;
-        case '=':
-        {
-            const char *vs = data + arg->size() + 1;
-            const char *ve;
-            if (*vs == '\"')
+            this->cursor += breakPoint;
+            switch (this->cursor[0])
             {
-                ++vs;
-                ve = std::strpbrk(vs, "\"");
-            }
-            else
+            case ' ':
+            case '\n':
+                ++this->cursor;
+                return Parm_t{.arg = CompanionSatellite::ARG_e(i), .val = "t"};
+            case '=':
             {
-                ve = std::strpbrk(vs, " \n");
-            }
-            if (ve != nullptr)
-            {
-                this->_cursor = ve + 1;
+                this->cursor++;
+                char delimiter[] = " \n";
+                if (this->cursor[0] == '"')
+                {
+                    this->cursor++;
+                    delimiter[0] = '\"';
+                }
+                const char *token = strtok_r(this->cursor, delimiter, &this->cursor);
+                if (token == nullptr)
+                {
+                    this->cursor = nullptr;
+                    return Parm_t{.arg = ARG_e::ARG_NONE, .val = "none"};
+                }
                 return Parm_t{
-                    .arg = (ARG_e)std::distance(arg_list.begin(), arg),
-                    .val = std::string(vs, ve - vs)};
+                    .arg = CompanionSatellite::ARG_e(i),
+                    .val = token};
             }
-            else
-            {
-                return Parm_t{
-                    .arg = ARG_e::ARG_NONE,
-                    .val = "f"};
             }
-        }
-        break;
-        default:
-        {
-            return Parm_t{
-                .arg = ARG_e::ARG_NONE,
-                .val = "f"};
-        }
-        break;
         }
     }
-    else
-    {
-        return Parm_t{
-            .arg = ARG_e::ARG_NONE,
-            .val = "none"};
-    }
+
+    return Parm_t{
+        .arg = ARG_e::ARG_NONE,
+        .val = "none"};
 }
 
-int CompanionSatellite::parseData(const char *data)
+int CompanionSatellite::parseData()
 {
-    if (!data)
+    if (this->cursor == nullptr || *this->cursor == '\0')
         return -1;
 
-    this->_cursor = data;
+    // printf("'%s'\n", this->cursor);
+
     int ret = 0;
-    CMD_e cmd = parseCmdType(_cursor);
+    CMD_e cmd = parseCmdType();
     while (cmd != CMD_e::CMD_NONE)
     {
+        // printf("'%s'\n", this->cursor);
+
         cmd_t command = {.cmd = cmd};
-        Parm_t parm = parseParameters(_cursor);
+        Parm_t parm = parseParameters();
         while (parm.arg != ARG_e::ARG_NONE)
         {
             command.parm.push(std::move(parm));
-            parm = parseParameters(_cursor);
+            parm = parseParameters();
         }
 
         this->_cmd_buffer.push(std::move(command));
         ret++;
 
-        cmd = parseCmdType(_cursor);
+        cmd = parseCmdType();
     }
 
+    this->cursor = nullptr;
     return ret;
 }
 
@@ -199,26 +187,9 @@ void CompanionSatellite::keepAlive(unsigned long timeDiff)
         this->pingTimeout = 0;
     }
 }
-
-/**
- * Starts and maintains the connection to Companion.
- * @param data from the establishd tcp connection
- * @return
- */
-int CompanionSatellite::maintainConnection(const char *data)
+void CompanionSatellite::handleStartConnection(CompanionSatellite::cmd_t *c)
 {
-    this->parseData(data);
-
-    const unsigned long diff = millis() - lastmaintain;
-
-    while (!this->_cmd_buffer.empty())
-    {
-        auto c = &this->_cmd_buffer.front();
-        switch (this->state)
-        {
-        case CON_e::RECONNECT:
-        case CON_e::DISCONNECTED:
-            if (c->cmd != CMD_e::BEGIN)
+if (c->cmd != CMD_e::BEGIN)
             {
                 this->state = CON_e::RECONNECT;
                 this->transmitBuffer.clear();
@@ -245,89 +216,117 @@ int CompanionSatellite::maintainConnection(const char *data)
                     c->parm.pop();
                 }
             }
+}
+
+void CompanionSatellite::handleActiveConnection(CompanionSatellite::cmd_t *c)
+{
+    switch (c->cmd)
+    {
+    case CMD_e::PONG:
+        printf("PONG\n");
+        this->timeout = 0;
+        break;
+    case CMD_e::BRIGHTNESS:
+    {
+        printf("BRIGHTNESS\n");
+        break;
+    }
+    case CMD_e::KEYPRESS:
+    {
+        int index = -1;
+        bool press = false;
+        while (!c->parm.empty())
+        {
+            auto p = &c->parm.front();
+            switch (p->arg)
+            {
+            case ARG_e::KEY:
+                index = std::stoi(p->val);
+                break;
+
+            case ARG_e::PRESSED:
+                press = (p->val == "t");
+                break;
+            }
+            c->parm.pop();
+        }
+        if (index > -1)
+        {
+            this->keyState[index].pressed = press;
+            this->update = true;
+        }
+        break;
+    }
+    case CMD_e::KEYSTATE:
+    {
+        int index = -1;
+        std::string color;
+        std::string text;
+        while (!c->parm.empty())
+        {
+            auto p = &c->parm.front();
+            switch (p->arg)
+            {
+            case ARG_e::KEY:
+                index = std::stoi(p->val);
+                break;
+
+            case ARG_e::TYPE:
+                // TODO:
+                break;
+
+            case ARG_e::BITMAP:
+                // TODO:
+                break;
+
+            case ARG_e::COLOR:
+                color = p->val;
+                break;
+
+            case ARG_e::TEXT:
+                text = B64::decode(p->val);
+                break;
+            }
+            c->parm.pop();
+        }
+        if (index > -1)
+        {
+            this->keyState[index].color = color;
+            this->keyState[index].text = text;
+            this->update = true;
+        }
+        break;
+    }
+    break;
+    }
+}
+
+/**
+ * Starts and maintains the connection to Companion.
+ * @param data from the establishd tcp connection
+ * @return
+ */
+int CompanionSatellite::maintainConnection(char *data)
+{
+    this->cursor = data;
+    this->parseData();
+
+    const unsigned long diff = millis() - lastmaintain;
+
+    while (!this->_cmd_buffer.empty())
+    {
+        auto c = &this->_cmd_buffer.front();
+        switch (this->state)
+        {
+        case CON_e::RECONNECT:
+        case CON_e::DISCONNECTED:
+            this->handleStartConnection(c);
             break;
         case CON_e::CONNECTED:
             break;
         case CON_e::ACTIVE:
-            switch (c->cmd)
-            {
-            case CMD_e::PONG:
-                printf("PONG\n");
-                this->timeout = 0;
-                break;
-            case CMD_e::BRIGHTNESS:
-            {
-                printf("BRIGHTNESS\n");
-                break;
-            }
-            case CMD_e::KEYPRESS:
-            {
-                int index = -1;
-                bool press = false;
-                while (!c->parm.empty())
-                {
-                    auto p = &c->parm.front();
-                    switch (p->arg)
-                    {
-                    case ARG_e::KEY:
-                        index = std::stoi(p->val);
-                        break;
-
-                    case ARG_e::PRESSED:
-                        press = (p->val == "t");
-                        break;
-                    }
-                    c->parm.pop();
-                }
-                if (index > -1)
-                {
-                    this->keyState[index].pressed = press;
-                    this->update = true;
-                }
-                break;
-            }
-            case CMD_e::KEYSTATE:
-            {
-                int index = -1;
-                std::string color;
-                std::string text;
-                while (!c->parm.empty())
-                {
-                    auto p = &c->parm.front();
-                    switch (p->arg)
-                    {
-                    case ARG_e::KEY:
-                        index = std::stoi(p->val);
-                        break;
-
-                    case ARG_e::TYPE:
-                        // TODO:
-                        break;
-
-                    case ARG_e::BITMAP:
-                        // TODO:
-                        break;
-
-                    case ARG_e::COLOR:
-                        color = p->val;
-                        break;
-
-                    case ARG_e::TEXT:
-                        text = p->val;
-                        break;
-                    }
-                    c->parm.pop();
-                }
-                if (index > -1)
-                {
-                    this->keyState[index].color = color;
-                    this->keyState[index].text = text;
-                    this->update = true;
-                }
-                break;
-            }
+            this->handleActiveConnection(c);
             break;
-            }
         case CON_e::PENDINGADD:
             if (c->cmd != CMD_e::ADDDEVICE)
             {

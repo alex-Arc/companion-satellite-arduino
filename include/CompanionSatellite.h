@@ -46,16 +46,16 @@ private:
     };
 
     const std::vector<std::string> cmd_list = {
-        "ADD-DEVICE ",
-        "BEGIN ",
-        "BRIGHTNESS ",
-        "KEY-PRESS ",
-        "KEY-STATE ",
-        "KEYS-CLEAR ",
-        "PING ",
-        "PONG ",
-        "REMOVE-DEVICE ",
-        "ROTATE "};
+        "ADD-DEVICE",
+        "BEGIN",
+        "BRIGHTNESS",
+        "KEY-PRESS",
+        "KEY-STATE",
+        "KEYS-CLEAR",
+        "PING",
+        "PONG",
+        "REMOVE-DEVICE",
+        "ROTATE"};
 
     enum ARG_e
     {
@@ -125,16 +125,19 @@ private:
         bool pressed;
     } typedef keyStateProps_t;
 
-    CMD_e parseCmdType(const char *data);
-    Parm_t parseParameters(const char *data);
+    CMD_e parseCmdType();
+    Parm_t parseParameters();
+
+    void handleActiveConnection(cmd_t *c);
+    void handleStartConnection(cmd_t *c);
 
     unsigned long timeout = 0;
     unsigned long pingTimeout = 0;
     unsigned long lastmaintain = millis();
 
     std::queue<cmd_t> _cmd_buffer;
-    const char *_cursor = nullptr;
-    int parseData(const char *data);
+    char *cursor = nullptr;
+    int parseData();
     void addDevice();
     void keepAlive(unsigned long timeDiff);
 
@@ -154,7 +157,7 @@ public:
     bool isConnected() { return state >= CON_e::CONNECTED; };
     bool isActive() { return state >= CON_e::ACTIVE; };
 
-    int maintainConnection(const char *data = nullptr);
+    int maintainConnection(char *data = nullptr);
     int disconnect();
 };
 #endif
